@@ -1,0 +1,18 @@
+[package]
+name = "yobsidian"
+version = "0.1.0"
+description = "Personal Obsidian-compatible notes app"
+edition = "2021"
+
+[lib]
+# Tauri needs the crate as a lib for mobile targets and as a staticlib/cdylib there.
+name = "yobsidian_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

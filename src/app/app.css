@@ -1,0 +1,151 @@
+:root {
+  --bg: #ffffff;
+  --bg-secondary: #f6f6f6;
+  --border: #e3e3e3;
+  --text: #222222;
+  --text-muted: #6b6b6b;
+  --accent: #7c5cdb;
+  --accent-soft: rgba(124, 92, 219, 0.12);
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1e1e;
+    --bg-secondary: #262626;
+    --border: #363636;
+    --text: #dadada;
+    --text-muted: #999999;
+    --accent: #a88bfa;
+    --accent-soft: rgba(168, 139, 250, 0.16);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  grid-template-rows: 1fr auto;
+  height: 100%;
+}
+
+.sidebar {
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  overflow: auto;
+  padding: 8px;
+}
+
+.vault-name {
+  font-weight: 600;
+  padding: 6px 8px 10px;
+}
+
+.tree,
+.tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tree ul {
+  padding-left: 14px;
+}
+
+.tree-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  padding: 3px 8px;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-row:hover {
+  background: var(--accent-soft);
+}
+
+.tree-row.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.chevron {
+  display: inline-block;
+  width: 14px;
+  color: var(--text-muted);
+}
+
+.workspace {
+  overflow: auto;
+  padding: 24px 40px;
+}
+
+.tab-title {
+  font-size: 1.6em;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.note-source {
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.empty {
+  color: var(--text-muted);
+}
+
+.status-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+  padding: 4px 12px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .app {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto;
+  }
+  .sidebar {
+    max-height: 40vh;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .workspace {
+    padding: 16px;
+  }
+}
