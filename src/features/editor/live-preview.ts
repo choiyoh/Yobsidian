@@ -4,6 +4,7 @@ import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
 import { parseLinkInner, TAG_RE, WIKILINK_RE } from "@/core/index/parse";
 import { basename, stem } from "@/core/vault";
 import { editorEnv, editorMode } from "./env";
+import { parseTable, TableWidget } from "./table";
 import {
   BulletWidget,
   CheckboxWidget,
@@ -165,9 +166,24 @@ export function buildDecorations(state: EditorState): DecorationSet {
             tree_.push(line("cm-codeblock" + (i === 0 ? " cm-codeblock-first" : "") + (i === count - 1 ? " cm-codeblock-last" : "")).range(pos)),
           );
           break;
-        case "Table":
+        case "Table": {
+          // Away from the cursor (or in reading mode) the table is drawn as a real <table>; otherwise the source stays editable.
+          const first = doc.lineAt(from);
+          const last = doc.lineAt(to);
+          if (parent?.name !== "Blockquote" && /^\s*$/.test(doc.sliceString(first.from, from)) && !touches(first.from, last.to)) {
+            const lines: string[] = [];
+            for (let n = first.number; n <= last.number; n++) lines.push(doc.line(n).text);
+            const model = parseTable(lines, env);
+            if (model) {
+              const range = { from: first.from, to: last.to };
+              skip.push(range);
+              tree_.push(Decoration.replace({ widget: new TableWidget(model, env), block: true }).range(range.from, range.to));
+              return false;
+            }
+          }
           eachLine(from, to, (pos) => tree_.push(line("cm-table-line").range(pos)));
           break;
+        }
       }
     },
   });
