@@ -34,7 +34,7 @@ export class ForceSimulation {
   constructor(
     positions: { x: number; y: number }[],
     readonly links: [number, number][],
-    readonly opts: SimOptions = positions.length > 1500 ? { ...DEFAULT_SIM, theta: 1.3 } : DEFAULT_SIM,
+    public opts: SimOptions = positions.length > 1500 ? { ...DEFAULT_SIM, theta: 1.3 } : DEFAULT_SIM,
   ) {
     const n = (this.n = positions.length);
     this.x = new Float64Array(n);

@@ -469,6 +469,74 @@ button {
   position: relative;
   flex: 1;
   min-height: 0;
+  background: radial-gradient(ellipse at center, var(--bg) 40%, color-mix(in srgb, var(--bg) 92%, var(--text)) 100%);
+}
+.graph-gear {
+  font-size: 15px;
+  line-height: 1;
+  padding: 3px 7px;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.graph-gear:hover,
+.graph-gear.active {
+  color: var(--text);
+  background: var(--accent-soft);
+}
+.graph-panel {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 220px;
+  max-height: calc(100% - 40px);
+  overflow: auto;
+  padding: 4px 12px 10px;
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.18);
+}
+.graph-panel h4 {
+  margin: 10px 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.graph-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 6px 0;
+  color: var(--text);
+}
+.graph-slider input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.graph-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0;
+}
+.graph-reset {
+  margin-top: 10px;
+  font: inherit;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+.graph-reset:hover {
+  color: var(--text);
 }
 .graph-canvas-wrap {
   position: absolute;

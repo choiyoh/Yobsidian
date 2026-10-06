@@ -142,3 +142,36 @@ export function groupColor(group: string): string {
 export function nodeRadius(degree: number): number {
   return Math.min(16, 3.5 + Math.sqrt(degree) * 1.9);
 }
+
+/** Look and physics knobs, mirroring Obsidian's graph settings panel. */
+export interface GraphStyle {
+  /** Multiplier on node radius. */
+  nodeSize: number;
+  /** Multiplier on link line width. */
+  linkWidth: number;
+  /** Rest length of a link, in graph units. */
+  linkDistance: number;
+  /** Repulsion between nodes. */
+  repel: number;
+  /** Pull towards the centre. */
+  center: number;
+  /** Zoom level at which labels start appearing; lower shows them sooner. */
+  labelZoom: number;
+  arrows: boolean;
+}
+
+export const DEFAULT_STYLE: GraphStyle = { nodeSize: 1, linkWidth: 1, linkDistance: 38, repel: 90, center: 0.035, labelZoom: 0.8, arrows: false };
+
+export function sanitizeStyle(raw: Partial<GraphStyle> | undefined): GraphStyle {
+  const num = (v: unknown, lo: number, hi: number, d: number) => (typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d);
+  const d = DEFAULT_STYLE;
+  return {
+    nodeSize: num(raw?.nodeSize, 0.4, 2.5, d.nodeSize),
+    linkWidth: num(raw?.linkWidth, 0.3, 3, d.linkWidth),
+    linkDistance: num(raw?.linkDistance, 10, 140, d.linkDistance),
+    repel: num(raw?.repel, 10, 300, d.repel),
+    center: num(raw?.center, 0, 0.15, d.center),
+    labelZoom: num(raw?.labelZoom, 0.1, 2.5, d.labelZoom),
+    arrows: raw?.arrows === true,
+  };
+}
