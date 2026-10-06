@@ -32,4 +32,6 @@ npm run build          # 웹 정적 빌드 → dist/
 npm run desktop:build  # 현재 OS용 설치 파일 → src-tauri/target/release/bundle/
 ```
 
+배포와 설치 파일 받는 법은 [배포 가이드](docs/DEPLOY.md)를 보세요.
+
 윈도우·맥 설치 파일은 PR마다 GitHub Actions(CI)가 빌드해서 아티팩트로 올린다.
