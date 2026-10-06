@@ -1,0 +1,159 @@
+.sync-dialog {
+  margin-top: 8vh;
+  width: min(600px, 94vw);
+  max-height: 80vh;
+  overflow: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+  padding: 4px 20px 16px;
+}
+.sync-dialog header {
+  display: flex;
+  align-items: center;
+}
+.sync-dialog h2 {
+  flex: 1;
+  font-size: 1.2em;
+}
+.sync-dialog h3 {
+  font-size: 0.95em;
+  margin: 18px 0 6px;
+  color: var(--text-muted);
+}
+.sync-dialog section + section {
+  border-top: 1px solid var(--border);
+  margin-top: 14px;
+}
+.sync-dialog p {
+  margin: 6px 0;
+}
+.sync-dialog code {
+  background: var(--code-bg);
+  border-radius: 4px;
+  padding: 0 4px;
+  word-break: break-all;
+}
+.sync-dialog button,
+.sync-badge {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.sync-dialog button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.sync-dialog button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.sync-dialog button.close,
+.sync-dialog button.link {
+  background: none;
+  border: 0;
+  padding: 2px 4px;
+}
+.sync-dialog button.link {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+.dialog-actions.left {
+  justify-content: flex-start;
+}
+.sync-error {
+  color: var(--danger);
+}
+.sync-warning {
+  background: var(--accent-soft);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 10px 0;
+}
+.sync-warning ul,
+.sync-issues ul,
+.recent {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+.recent {
+  list-style: none;
+  padding-left: 0;
+  font-size: 0.9em;
+}
+.settings-form label {
+  display: block;
+  margin: 10px 0;
+  color: var(--text-muted);
+}
+.settings-form input,
+.drive-new input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.drive-crumbs {
+  margin: 6px 0;
+}
+.drive-folders {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 32vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.drive-folders li button {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+}
+.drive-folders li button:hover {
+  background: var(--accent-soft);
+}
+.drive-new {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.sync-badge {
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: none;
+  border-color: transparent;
+}
+.sync-badge:hover {
+  border-color: var(--border);
+}
+.sync-badge.ok {
+  color: var(--text-muted);
+}
+.sync-badge.busy {
+  color: var(--accent);
+}
+.sync-badge.warn {
+  color: #b8860b;
+}
+.sync-badge.error {
+  color: var(--danger);
+}

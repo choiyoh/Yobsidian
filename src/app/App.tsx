@@ -1,33 +1,49 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NoteIndex } from "@/core/index";
 import { createNote, movePath, sanitizeFileName, trashPath, uniquePath } from "@/core/notes";
-import { SAMPLE_FILES } from "@/core/vault/sample-vault";
-import { buildTree, dirname, extname, IdbAdapter, isMarkdown, isWithin, joinPath, stem, type TreeNode, type VaultAdapter } from "@/core/vault";
+import { buildTree, dirname, extname, isMarkdown, isWithin, joinPath, stem, type TreeNode, type VaultAdapter } from "@/core/vault";
 import { detectPlatform } from "@/core/platform";
 import type { EditorMode, LinkTarget } from "@/features/editor/env";
 import { NoteEditor, type NoteEditorHandle, type SaveState } from "@/features/editor/NoteEditor";
 import { GraphView } from "@/features/graph/GraphView";
 import { RightPanel } from "@/features/panels/RightPanel";
 import { TagPane } from "@/features/panels/TagPane";
+import { SyncBadge } from "@/features/sync/SyncBadge";
+import { SyncDialog } from "@/features/sync/SyncDialog";
+import { useDriveSync } from "@/features/sync/useDriveSync";
 import { QuickSwitcher } from "@/features/switcher/QuickSwitcher";
 import { FileTree } from "./FileTree";
+import { pickFolder } from "./pick-folder";
 import { useNavigation } from "./useNavigation";
+import { loadVaultConfig, openLocalVault, setDriveLink, switchLocalVault, vaultIdOf, type DriveLink, type LocalVault } from "./vault-config";
 
 // Opened once per page load (also across React StrictMode's double effects).
+// A folder on disk (desktop) or the browser-storage vault, as chosen in the sync dialog; a reload applies a change.
 let vaultPromise: Promise<VaultAdapter> | null = null;
-function openDefaultVault() {
-  // Web and desktop both keep the vault in IndexedDB for now; a real folder
-  // (desktop) and Google Drive plug in behind the same VaultAdapter later.
-  return (vaultPromise ??= IdbAdapter.open("default", SAMPLE_FILES));
+function openConfiguredVault() {
+  return (vaultPromise ??= openLocalVault(loadVaultConfig().local));
+}
+
+function switchVault(local: LocalVault) {
+  switchLocalVault(local);
+  window.location.reload();
 }
 
 export function App() {
   const [vault, setVault] = useState<VaultAdapter | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    openDefaultVault().then(setVault, (e) => setError(String(e)));
+    openConfiguredVault().then(setVault, (e) => setError(String(e)));
   }, []);
-  if (error) return <p className="empty">볼트를 열지 못했어요: {error}</p>;
+  if (error)
+    return (
+      <div className="empty">
+        <p>볼트를 열지 못했어요: {error}</p>
+        <p>
+          <button onClick={() => switchVault({ kind: "idb", name: "default" })}>기본 볼트로 열기</button>
+        </p>
+      </div>
+    );
   if (!vault) return <p className="empty">불러오는 중…</p>;
   return <Workspace vault={vault} />;
 }
@@ -65,6 +81,10 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
   const [menu, setMenu] = useState<{ x: number; y: number; node: TreeNode } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef(0);
+  const [syncDialog, setSyncDialog] = useState(false);
+  const [vaultConfig, setVaultConfig] = useState(loadVaultConfig);
+  const link: DriveLink | null = vaultConfig.links[vault.id] ?? null;
+  const sync = useDriveSync(vault, link);
 
   const say = useCallback((message: string) => {
     setToast(message);
@@ -85,6 +105,33 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
     } catch {
       // not persisted; fine
     }
+  };
+
+  // Tell the user when a sync had to keep both versions of a note.
+  const conflictCount = sync.status?.conflicts.length ?? 0;
+  const seenConflicts = useRef(0);
+  useEffect(() => {
+    if (conflictCount > seenConflicts.current) say("양쪽에서 다르게 수정된 노트가 있어서 두 버전을 모두 남겼어요. 동기화 창에서 확인하세요");
+    seenConflicts.current = conflictCount;
+  }, [conflictCount, say]);
+
+  const linkDrive = (folder: DriveLink) => {
+    const current = loadVaultConfig();
+    if (current.local.kind === "idb" && current.local.name === "default") {
+      // Keep the sample notes out of the user's Drive: sync into a fresh, empty vault instead.
+      const fresh: LocalVault = { kind: "idb", name: `drive-${folder.folderId}` };
+      setDriveLink(vaultIdOf(fresh), folder);
+      switchVault(fresh);
+      return;
+    }
+    setDriveLink(vault.id, folder);
+    setVaultConfig(loadVaultConfig());
+  };
+
+  const unlinkDrive = async () => {
+    await sync.forget();
+    setDriveLink(vault.id, null);
+    setVaultConfig(loadVaultConfig());
   };
 
   // Build the index, keep the explorer and index in step with the vault, then open a first note.
@@ -340,6 +387,7 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
 
       <footer className="status-bar">
         <span>{platform === "desktop" ? "데스크톱" : "웹"}</span>
+        <SyncBadge link={link} sync={sync} onClick={() => setSyncDialog(true)} />
         <span className="spacer" />
         <span>{active ?? ""}</span>
         {active && <span className={"save-state " + saveState}>{SAVE_LABEL[saveState]}</span>}
@@ -375,6 +423,23 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
             </button>
           </li>
         </ul>
+      )}
+
+      {syncDialog && (
+        <SyncDialog
+          platform={platform}
+          vaultName={vault.name}
+          local={vaultConfig.local}
+          recentFolders={vaultConfig.recent}
+          link={link}
+          sync={sync}
+          onClose={() => setSyncDialog(false)}
+          onOpenFolder={() => void pickFolder().then((path) => path && switchVault({ kind: "fs", path }), (e) => say(`폴더를 열지 못했어요: ${e}`))}
+          onSwitchLocal={switchVault}
+          onLink={linkDrive}
+          onUnlink={() => void unlinkDrive()}
+          onOpenNote={(path) => (setSyncDialog(false), openNote(path))}
+        />
       )}
 
       {toast && <div className="toast">{toast}</div>}
