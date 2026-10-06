@@ -1,0 +1,74 @@
+name: Deploy web
+
+# Publishes the static web build (dist/) after every push to main.
+# Nothing is deployed until you pick a host: set the repository variable DEPLOY_TARGET to
+# `cloudflare` or `github-pages` (Settings → Secrets and variables → Actions → Variables).
+# See docs/DEPLOY.md.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build
+    if: vars.DEPLOY_TARGET == 'cloudflare' || vars.DEPLOY_TARGET == 'github-pages'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      # The Google client ID is public (it is visible in every web app's network traffic).
+      # Never put VITE_GOOGLE_CLIENT_SECRET here: it would end up in the public bundle.
+      - run: npm run build
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+      - uses: actions/upload-pages-artifact@v3
+        if: vars.DEPLOY_TARGET == 'github-pages'
+        with:
+          path: dist
+      - uses: actions/upload-artifact@v4
+        if: vars.DEPLOY_TARGET == 'cloudflare'
+        with:
+          name: web-dist
+          path: dist
+
+  github-pages:
+    name: GitHub Pages
+    needs: build
+    if: vars.DEPLOY_TARGET == 'github-pages'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+  cloudflare:
+    name: Cloudflare Pages
+    needs: build
+    if: vars.DEPLOY_TARGET == 'cloudflare'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: dist
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=${{ vars.CLOUDFLARE_PROJECT || 'yobsidian' }} --branch=main

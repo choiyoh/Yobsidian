@@ -43,7 +43,7 @@ Yobsidian이 내 구글 드라이브에 접근하려면 **내 구글 계정에�
 - 애플리케이션 유형: **웹 애플리케이션**
 - **승인된 JavaScript 원본**에 앱을 여는 주소를 넣습니다.
   - 개발할 때: `http://localhost:1420`
-  - 배포했다면: `https://내아이디.github.io` 처럼 주소창에 보이는 origin (경로 `/…`는 빼고)
+  - 배포했다면: 배포된 주소의 origin (경로 `/…`는 빼고). GitHub Pages면 `https://choiyoh.github.io`, Cloudflare Pages면 `https://yobsidian.pages.dev` 처럼요. 호스트 고르는 법과 배포 순서는 [배포 가이드](DEPLOY.md)를 보세요.
 - 리디렉션 URI는 비워 둬도 돼요.
 - 만들면 나오는 **클라이언트 ID**를 복사합니다. (웹에서는 보안 비밀이 필요 없어요.)
 
