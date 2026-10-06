@@ -71,6 +71,16 @@ describe("movePath", () => {
     expect(index.has("g/A.md")).toBe(true);
   });
 
+  it("moves a note into a folder and out to the root, fixing path-style links", async () => {
+    const { vault, index } = await setup({ "A.md": "[[B]]", "B.md": "[[A]]", "dir/C.md": "[[dir/D]]", "dir/D.md": "" });
+    await movePath(vault, index, "B.md", "dir/B.md");
+    expect(await vault.readText("A.md")).toBe("[[B]]");
+    expect(await vault.readText("dir/B.md")).toBe("[[A]]");
+    await movePath(vault, index, "dir/D.md", "D.md");
+    expect(await vault.readText("dir/C.md")).toBe("[[D]]");
+    expect(index.has("D.md")).toBe(true);
+  });
+
   it("fails without touching anything if the destination exists", async () => {
     const { vault, index } = await setup({ "A.md": "", "B.md": "[[A]]" });
     await expect(movePath(vault, index, "A.md", "B.md")).rejects.toThrow();

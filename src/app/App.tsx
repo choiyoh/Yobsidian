@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NoteIndex } from "@/core/index";
 import { dailyNotePath, applyTemplate, listTemplates, readDailyConfig, readTemplateConfig } from "@/core/templates";
 import { createNote, movePath, sanitizeFileName, trashPath, uniquePath } from "@/core/notes";
-import { buildTree, dirname, loadWebFolder, extname, isMarkdown, isWithin, joinPath, stem, type TreeNode, type VaultAdapter } from "@/core/vault";
+import { basename, buildTree, dirname, loadWebFolder, extname, isMarkdown, isWithin, joinPath, stem, type TreeNode, type VaultAdapter } from "@/core/vault";
 import { detectPlatform } from "@/core/platform";
 import type { EditorMode, LinkTarget } from "@/features/editor/env";
 import { NoteEditor, type NoteEditorHandle, type SaveState } from "@/features/editor/NoteEditor";
@@ -370,6 +370,21 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
     }
   };
 
+  /** Drag-and-drop: move a note or folder into `folder` ("" = vault root), keeping links intact. */
+  const moveInto = async (path: string, folder: string) => {
+    try {
+      const entry = await vault.stat(path);
+      if (!entry || dirname(path) === folder || isWithin(folder, path)) return;
+      const dest = joinPath(folder, basename(path));
+      if (await vault.stat(dest)) return say("그 폴더에 같은 이름이 이미 있어요");
+      await editor.current?.flush();
+      await movePath(vault, index, path, dest);
+      nav.remap((p) => (isWithin(p, path) ? dest + p.slice(path.length) : p));
+    } catch (e) {
+      say(`옮기지 못했어요: ${e instanceof Error ? e.message : e}`);
+    }
+  };
+
   const remove = async (path: string) => {
     try {
       await editor.current?.flush();
@@ -483,6 +498,7 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
                   onContextMenu={onContextMenu}
                   onRename={(p, n) => void rename(p, n)}
                   onCancelRename={() => setRenaming(null)}
+                  onMove={(p, f) => void moveInto(p, f)}
                 />
               )}
             </>
