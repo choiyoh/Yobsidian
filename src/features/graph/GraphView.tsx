@@ -148,22 +148,27 @@ export function GraphView({ index, activePath, onOpen }: Props) {
   );
 }
 
-/** Small graph of the open note's direct neighbourhood for the right panel. */
-export function LocalGraph({ index, path, onOpen }: { index: NoteIndex; path: string; onOpen(path: string): void }) {
+/** Graph for the right panel: the open note's neighbourhood, or the whole vault when no note is open. `fill` stretches it to the panel's height. */
+export function LocalGraph({ index, path, onOpen, fill = false }: { index: NoteIndex; path: string | null; onOpen(path: string): void; fill?: boolean }) {
   const [depth, setDepth] = useState(1);
-  const filter = useMemo<GraphFilter>(() => ({ scope: "local", center: path, depth, query: "", showOrphans: true }), [path, depth]);
+  const filter = useMemo<GraphFilter>(
+    () => (path ? { scope: "local", center: path, depth, query: "", showOrphans: true } : { scope: "global", center: null, depth, query: "", showOrphans: true }),
+    [path, depth],
+  );
   const model = useGraphModel(index, filter);
   const positions = useRef(new Map<string, { x: number; y: number }>());
   return (
-    <div className="local-graph">
+    <div className={"local-graph" + (fill ? " fill" : "")}>
       <div className="local-graph-stage">
         <GraphCanvas model={model} activePath={path} colorMode="none" fitKey={`${path}|${depth}`} positions={positions} alwaysLabels onOpen={(p) => onOpen(p)} />
         {model.nodes.length <= 1 && <p className="graph-empty muted">연결된 노트가 없어요</p>}
       </div>
-      <label className="graph-field">
-        깊이 {depth}
-        <input type="range" min={1} max={4} value={depth} onChange={(e) => setDepth(Number(e.target.value))} />
-      </label>
+      {path && (
+        <label className="graph-field">
+          깊이 {depth}
+          <input type="range" min={1} max={4} value={depth} onChange={(e) => setDepth(Number(e.target.value))} />
+        </label>
+      )}
     </div>
   );
 }

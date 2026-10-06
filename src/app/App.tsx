@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NoteIndex } from "@/core/index";
 import { dailyNotePath, applyTemplate, listTemplates, readDailyConfig, readTemplateConfig } from "@/core/templates";
 import { createNote, movePath, sanitizeFileName, trashPath, uniquePath } from "@/core/notes";
-import { buildTree, dirname, extname, isMarkdown, isWithin, joinPath, stem, type TreeNode, type VaultAdapter } from "@/core/vault";
+import { buildTree, dirname, loadWebFolder, extname, isMarkdown, isWithin, joinPath, stem, type TreeNode, type VaultAdapter } from "@/core/vault";
 import { detectPlatform } from "@/core/platform";
 import type { EditorMode, LinkTarget } from "@/features/editor/env";
 import { NoteEditor, type NoteEditorHandle, type SaveState } from "@/features/editor/NoteEditor";
@@ -17,7 +17,8 @@ import { SyncDialog } from "@/features/sync/SyncDialog";
 import { useDriveSync } from "@/features/sync/useDriveSync";
 import { QuickSwitcher } from "@/features/switcher/QuickSwitcher";
 import { FileTree } from "./FileTree";
-import { pickFolder } from "./pick-folder";
+import { chooseFiles, chooseLocalFolder, importFiles } from "./open-local";
+import { useResizableWidth } from "./useResizableWidth";
 import { applySettings, loadSettings, saveSettings, type Settings } from "./settings";
 import { useNavigation } from "./useNavigation";
 import { loadVaultConfig, openLocalVault, setDriveLink, switchLocalVault, vaultIdOf, type DriveLink, type LocalVault } from "./vault-config";
@@ -40,15 +41,21 @@ export function App() {
   useEffect(() => {
     openConfiguredVault().then(setVault, (e) => setError(String(e)));
   }, []);
-  if (error)
+  if (error) {
+    const local = loadVaultConfig().local;
+    const needsPermission = error.includes("permission-needed:") && local.kind === "fs";
     return (
       <div className="empty">
-        <p>볼트를 열지 못했어요: {error}</p>
+        {needsPermission ? <p>브라우저가 폴더 접근 권한을 다시 확인해야 해요</p> : <p>볼트를 열지 못했어요: {error}</p>}
         <p>
+          {needsPermission && (
+            <button onClick={() => void loadWebFolder(local.path, true).then(() => window.location.reload(), (e) => setError(String(e)))}>폴더 접근 허용</button>
+          )}{" "}
           <button onClick={() => switchVault({ kind: "idb", name: "default" })}>기본 볼트로 열기</button>
         </p>
       </div>
     );
+  }
   if (!vault) return <p className="empty">불러오는 중…</p>;
   return <Workspace vault={vault} />;
 }
@@ -88,6 +95,14 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
   const [showLeft, setShowLeft] = useState(true);
   const [showRight, setShowRight] = useState(() => window.innerWidth > 1000);
   const [view, setViewState] = useState<"note" | "graph">("note");
+  const [graphOnly, setGraphOnlyState] = useState(() => {
+    try {
+      return localStorage.getItem("yobsidian.graphOnly") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const rightPanel = useResizableWidth("yobsidian.rightWidth", 300, 220, 720, "right");
   const [switcher, setSwitcher] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; node: TreeNode } | null>(null);
@@ -115,6 +130,37 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
     await editor.current?.flush();
     setViewState(v);
   }, []);
+
+  const setGraphOnly = (on: boolean) => {
+    setGraphOnlyState(on);
+    try {
+      localStorage.setItem("yobsidian.graphOnly", on ? "1" : "0");
+    } catch {
+      // not persisted; fine
+    }
+  };
+
+  // Open a folder from this computer (a real vault), or where the browser can't, import its files into this vault.
+  const openFromComputer = async (kind: "folder" | "files") => {
+    try {
+      let files: File[] = [];
+      if (kind === "folder") {
+        const chosen = await chooseLocalFolder();
+        if (chosen === null) return;
+        if (chosen !== "unsupported") return switchVault(chosen);
+        files = await chooseFiles({ folder: true });
+      } else {
+        files = await chooseFiles({});
+      }
+      if (files.length === 0) return;
+      const written = await importFiles(vault, files);
+      const firstNote = written.find(isMarkdown);
+      say(`${written.length}개 파일을 가져왔어요`);
+      if (firstNote) openNote(firstNote);
+    } catch (e) {
+      say(`열지 못했어요: ${e}`);
+    }
+  };
 
   const setMode = (m: EditorMode) => {
     setModeState(m);
@@ -370,6 +416,9 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
       { id: "mode-source", label: "보기 모드: 소스", run: () => setMode("source") },
       { id: "mode-reading", label: "보기 모드: 읽기", detail: "Ctrl/Cmd+E", run: () => setMode("reading") },
       { id: "left", label: showLeft ? "왼쪽 사이드바 숨기기" : "왼쪽 사이드바 보기", run: () => setShowLeft(!showLeft) },
+      { id: "open-folder", label: "내 컴퓨터에서 폴더 열기", run: () => void openFromComputer("folder") },
+      { id: "import-files", label: "내 컴퓨터의 파일 가져오기", run: () => void openFromComputer("files") },
+      { id: "right-graph", label: graphOnly ? "오른쪽 패널: 탭으로 보기" : "오른쪽 패널: 그래프만 보기", run: () => (setGraphOnly(!graphOnly), setShowRight(true)) },
       { id: "right", label: showRight ? "오른쪽 패널 숨기기" : "오른쪽 패널 보기", run: () => setShowRight(!showRight) },
       { id: "tab-files", label: "파일 탐색기 보기", run: () => (setLeftTab("files"), setShowLeft(true)) },
       { id: "tab-tags", label: "태그 목록 보기", run: () => (setLeftTab("tags"), setShowLeft(true)) },
@@ -382,7 +431,7 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
     return list;
     // The actions close over current state, so rebuild whenever the palette is about to be shown.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [palette, active, view, showLeft, showRight, nav.back, nav.forward]);
+  }, [palette, active, view, showLeft, showRight, graphOnly, nav.back, nav.forward]);
 
   // ------------------------------------------------------------------ render
 
@@ -392,7 +441,7 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
   };
 
   return (
-    <div className={"app" + (showLeft ? "" : " no-left") + (showRight && active ? "" : " no-right")} onClick={() => setMenu(null)}>
+    <div className={"app" + (showLeft ? "" : " no-left") + (showRight ? "" : " no-right")} style={{ "--right-w": `${rightPanel.width}px` } as React.CSSProperties} onClick={() => setMenu(null)}>
       {showLeft && (
         <aside className="sidebar">
           <div className="sidebar-tabs">
@@ -416,6 +465,12 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
                   </button>
                   <button title="새 폴더" onClick={() => void newFolder("")}>
                     ▤
+                  </button>
+                  <button title="내 컴퓨터에서 폴더 열기" onClick={() => void openFromComputer("folder")}>
+                    📂
+                  </button>
+                  <button title="내 컴퓨터의 파일 가져오기" onClick={() => void openFromComputer("files")}>
+                    ⤓
                   </button>
                 </span>
               </header>
@@ -517,10 +572,14 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
         )}
       </main>
 
-      {showRight && active && (
+      {showRight && (
         <RightPanel
           index={index}
           path={active}
+          graphOnly={graphOnly}
+          onGraphOnly={setGraphOnly}
+          onClose={() => setShowRight(false)}
+          resizeHandle={<div className={"resize-handle" + (rightPanel.dragging ? " dragging" : "")} {...rightPanel.handleProps} />}
           onOpen={openNote}
           onCreate={(target, from) => void openLink({ target }, from)}
           onTag={openTag}
@@ -603,7 +662,7 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
           link={link}
           sync={sync}
           onClose={() => setSyncDialog(false)}
-          onOpenFolder={() => void pickFolder().then((path) => path && switchVault({ kind: "fs", path }), (e) => say(`폴더를 열지 못했어요: ${e}`))}
+          onOpenFolder={() => void openFromComputer("folder")}
           onSwitchLocal={switchVault}
           onLink={linkDrive}
           onUnlink={() => void unlinkDrive()}

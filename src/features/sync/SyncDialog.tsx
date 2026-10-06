@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { vaultIdOf, type DriveLink, type LocalVault } from "@/app/vault-config";
 import type { Platform } from "@/core/platform";
+import { supportsFolderPicker } from "@/core/vault";
 import { loadGoogleSettings, saveGoogleSettings } from "@/core/sync/auth";
 import { DriveFolderPicker } from "./DriveFolderPicker";
 import { timeAgo } from "./SyncBadge";
@@ -43,29 +44,27 @@ export function SyncDialog(props: Props) {
             <strong>{vaultName}</strong>{" "}
             <span className="muted">{local.kind === "fs" ? local.path : platform === "desktop" ? "이 앱의 저장 공간" : "이 브라우저의 저장 공간"}</span>
           </p>
-          {platform === "desktop" ? (
-            <>
-              <p className="muted">옵시디언 볼트 폴더를 그대로 열 수 있어요. <code>.obsidian</code> 폴더는 읽기만 하고 바꾸지 않아요.</p>
-              <div className="dialog-actions left">
-                <button onClick={props.onOpenFolder}>폴더 열기…</button>
-                {local.kind === "fs" && <button onClick={() => props.onSwitchLocal({ kind: "idb", name: "default" })}>기본 볼트로</button>}
-              </div>
-              {recentFolders.filter((p) => !(local.kind === "fs" && local.path === p)).length > 0 && (
-                <ul className="recent">
-                  {recentFolders
-                    .filter((p) => !(local.kind === "fs" && local.path === p))
-                    .map((p) => (
-                      <li key={p}>
-                        <button className="link" onClick={() => props.onSwitchLocal({ kind: "fs", path: p })}>
-                          {p}
-                        </button>
-                      </li>
-                    ))}
-                </ul>
-              )}
-            </>
-          ) : (
-            <p className="muted">웹에서는 노트가 이 브라우저에 저장되고, 구글 드라이브와 동기화해서 다른 기기와 맞춰요. 폴더를 직접 여는 건 데스크톱 앱에서 할 수 있어요.</p>
+          <p className="muted">
+            {platform === "desktop" || supportsFolderPicker()
+              ? "옵시디언 볼트 폴더를 그대로 열 수 있어요. .obsidian 폴더는 읽기만 하고 바꾸지 않아요."
+              : "이 브라우저는 폴더를 직접 열 수 없어서, 고른 폴더의 파일을 이 볼트로 가져와요. 폴더를 직접 열려면 Chrome이나 Edge, 또는 데스크톱 앱을 쓰세요."}
+          </p>
+          <div className="dialog-actions left">
+            <button onClick={props.onOpenFolder}>{platform === "desktop" || supportsFolderPicker() ? "폴더 열기…" : "폴더 가져오기…"}</button>
+            {local.kind === "fs" && <button onClick={() => props.onSwitchLocal({ kind: "idb", name: "default" })}>기본 볼트로</button>}
+          </div>
+          {platform === "desktop" && recentFolders.filter((p) => !(local.kind === "fs" && local.path === p)).length > 0 && (
+            <ul className="recent">
+              {recentFolders
+                .filter((p) => !(local.kind === "fs" && local.path === p))
+                .map((p) => (
+                  <li key={p}>
+                    <button className="link" onClick={() => props.onSwitchLocal({ kind: "fs", path: p })}>
+                      {p}
+                    </button>
+                  </li>
+                ))}
+            </ul>
           )}
         </section>
 
