@@ -1,5 +1,6 @@
 import { SAMPLE_FILES } from "@/core/vault/sample-vault";
-import { FsAdapter, IdbAdapter, type VaultAdapter } from "@/core/vault";
+import { FsAdapter, IdbAdapter, webFsBackend, type VaultAdapter } from "@/core/vault";
+import { detectPlatform } from "@/core/platform";
 
 /** Where the notes live on this device. */
 export type LocalVault = { kind: "idb"; name: string } | { kind: "fs"; path: string };
@@ -45,7 +46,7 @@ export function saveVaultConfig(config: Stored) {
 }
 
 export function openLocalVault(local: LocalVault): Promise<VaultAdapter> {
-  return local.kind === "fs" ? FsAdapter.open(local.path) : IdbAdapter.open(local.name, local.name === "default" ? SAMPLE_FILES : {});
+  return local.kind === "fs" ? FsAdapter.open(local.path, detectPlatform() === "desktop" ? undefined : webFsBackend) : IdbAdapter.open(local.name, local.name === "default" ? SAMPLE_FILES : {});
 }
 
 /** Switch the local vault (the page reloads to open it). A folder vault is remembered in the recent list. */
