@@ -7,14 +7,17 @@ import type { VaultAdapter } from "./vault";
 export interface VaultConfig {
   newFileLocation: "root" | "current" | "folder";
   newFileFolderPath: string;
+  /** Obsidian's `attachmentFolderPath`: `/` or empty = vault root, `./name` = next to the note, otherwise a vault folder. */
+  attachmentFolderPath: string;
 }
 
 export async function readVaultConfig(vault: VaultAdapter): Promise<VaultConfig> {
-  const config: VaultConfig = { newFileLocation: "root", newFileFolderPath: "" };
+  const config: VaultConfig = { newFileLocation: "root", newFileFolderPath: "", attachmentFolderPath: "" };
   try {
     const raw = JSON.parse(await vault.readText(`${CONFIG_DIR}/app.json`));
     if (raw.newFileLocation === "current" || raw.newFileLocation === "folder") config.newFileLocation = raw.newFileLocation;
     if (typeof raw.newFileFolderPath === "string") config.newFileFolderPath = raw.newFileFolderPath.replace(/^\/+|\/+$/g, "");
+    if (typeof raw.attachmentFolderPath === "string") config.attachmentFolderPath = raw.attachmentFolderPath.trim();
   } catch {
     // no config, or not valid JSON: keep defaults
   }

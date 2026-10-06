@@ -20,6 +20,10 @@ export interface EditorEnv {
   openLink(link: LinkTarget): void;
   openUrl(url: string): void;
   openTag(tag: string): void;
+  /** Store a pasted or dropped file in the vault; resolves to its vault path. */
+  saveAttachment(file: { bytes: Uint8Array; name?: string; mime?: string }): Promise<string>;
+  /** Show a short message to the user. */
+  notify(message: string): void;
 }
 
 export const editorEnv = Facet.define<EditorEnv, EditorEnv>({

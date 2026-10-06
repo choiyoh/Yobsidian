@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NoteIndex } from "@/core/index";
+import { dailyNotePath, applyTemplate, listTemplates, readDailyConfig, readTemplateConfig } from "@/core/templates";
 import { createNote, movePath, sanitizeFileName, trashPath, uniquePath } from "@/core/notes";
 import { buildTree, dirname, extname, isMarkdown, isWithin, joinPath, stem, type TreeNode, type VaultAdapter } from "@/core/vault";
 import { detectPlatform } from "@/core/platform";
 import type { EditorMode, LinkTarget } from "@/features/editor/env";
 import { NoteEditor, type NoteEditorHandle, type SaveState } from "@/features/editor/NoteEditor";
 import { GraphView } from "@/features/graph/GraphView";
+import { ListPicker, type PickerItem } from "@/features/palette/ListPicker";
 import { RightPanel } from "@/features/panels/RightPanel";
+import { SearchPane } from "@/features/search/SearchPane";
+import { SettingsDialog } from "@/features/settings/SettingsDialog";
 import { TagPane } from "@/features/panels/TagPane";
 import { SyncBadge } from "@/features/sync/SyncBadge";
 import { SyncDialog } from "@/features/sync/SyncDialog";
@@ -14,6 +18,7 @@ import { useDriveSync } from "@/features/sync/useDriveSync";
 import { QuickSwitcher } from "@/features/switcher/QuickSwitcher";
 import { FileTree } from "./FileTree";
 import { pickFolder } from "./pick-folder";
+import { applySettings, loadSettings, saveSettings, type Settings } from "./settings";
 import { useNavigation } from "./useNavigation";
 import { loadVaultConfig, openLocalVault, setDriveLink, switchLocalVault, vaultIdOf, type DriveLink, type LocalVault } from "./vault-config";
 
@@ -71,7 +76,14 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
   const [tree, setTree] = useState<TreeNode | null>(null);
   const [mode, setModeState] = useState<EditorMode>(loadMode);
   const [saveState, setSaveState] = useState<SaveState>("saved");
-  const [leftTab, setLeftTab] = useState<"files" | "tags">("files");
+  const [leftTab, setLeftTab] = useState<"files" | "search" | "tags">("files");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchFocus, setSearchFocus] = useState(0);
+  const [palette, setPalette] = useState(false);
+  const [addPropertyNonce, setAddPropertyNonce] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settings, setSettingsState] = useState(loadSettings);
+  const [templatePicker, setTemplatePicker] = useState<PickerItem[] | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [showLeft, setShowLeft] = useState(true);
   const [showRight, setShowRight] = useState(() => window.innerWidth > 1000);
@@ -91,6 +103,12 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(null), 3500);
   }, []);
+
+  const setSettings = (next: Settings) => {
+    setSettingsState(next);
+    saveSettings(next);
+  };
+  useEffect(() => applySettings(settings), [settings.theme, settings.fontSize]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The editor unmounts behind the graph, so save pending edits first.
   const setView = useCallback(async (v: "note" | "graph") => {
@@ -201,6 +219,84 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
     setShowLeft(true);
   }, []);
 
+  /** Open a note in the editor even when the graph is showing. */
+  const showNote = useCallback(
+    (path: string, reveal?: { heading?: string; block?: string; line?: number }) => {
+      setViewState("note");
+      nav.go(path, reveal);
+    },
+    [nav],
+  );
+
+  const openSearch = useCallback((query?: string) => {
+    if (query !== undefined) setSearchQuery(query);
+    setLeftTab("search");
+    setShowLeft(true);
+    setSearchFocus((n) => n + 1);
+  }, []);
+
+  /** Edit the open note's text (front matter changes). Goes through the editor when it is showing, else straight to the file. */
+  const editNote = useCallback(
+    async (edit: (text: string) => string) => {
+      if (!active) return;
+      try {
+        if (view === "note" && editor.current) return await editor.current.transform(edit);
+        const before = await vault.readText(active);
+        const after = edit(before);
+        if (after === before) return;
+        await vault.writeText(active, after);
+        index.setNote(active, after, (await vault.stat(active)) ?? undefined);
+      } catch (e) {
+        say(`노트를 고치지 못했어요: ${e instanceof Error ? e.message : e}`);
+      }
+    },
+    [active, view, vault, index, say],
+  );
+
+  const openDaily = useCallback(async () => {
+    try {
+      await editor.current?.flush();
+      const config = await readDailyConfig(vault, settings);
+      const now = new Date();
+      const path = dailyNotePath(now, config);
+      if (!index.has(path)) {
+        let text = "";
+        if (config.template) {
+          const templatePath = index.resolve(config.template, "") ?? `${config.template.replace(/\.md$/i, "")}.md`;
+          const tcfg = await readTemplateConfig(vault, settings);
+          text = await vault.readText(templatePath).then(
+            (t) => applyTemplate(t, { title: stem(path), now, ...tcfg }),
+            () => (say("일일 노트 템플릿을 찾지 못해서 빈 노트로 만들었어요"), ""),
+          );
+        }
+        await createNote(vault, index, { name: stem(path), folder: dirname(path), text });
+      }
+      showNote(path);
+    } catch (e) {
+      say(`일일 노트를 열지 못했어요: ${e instanceof Error ? e.message : e}`);
+    }
+  }, [vault, index, settings, showNote, say]);
+
+  const chooseTemplate = useCallback(async () => {
+    if (!active || view !== "note") return say("템플릿을 넣을 노트를 먼저 열어 주세요");
+    const config = await readTemplateConfig(vault, settings);
+    const paths = listTemplates(index.notePaths(), config.folder);
+    if (paths.length === 0) return say(`“${config.folder}” 폴더에 템플릿 노트가 없어요. 설정에서 폴더를 바꿀 수 있어요`);
+    setTemplatePicker(paths.map((p) => ({ id: p, label: stem(p), detail: dirname(p) })));
+  }, [active, view, vault, index, settings, say]);
+
+  const insertTemplate = async (templatePath: string) => {
+    setTemplatePicker(null);
+    if (!active) return;
+    try {
+      const config = await readTemplateConfig(vault, settings);
+      const text = applyTemplate(await vault.readText(templatePath), { title: stem(active), now: new Date(), ...config });
+      editor.current?.insert(text);
+    } catch (e) {
+      say(`템플릿을 넣지 못했어요: ${e instanceof Error ? e.message : e}`);
+    }
+  };
+
   const newFolder = async (parent: string) => {
     const path = uniquePath((p) => tree !== null && flat(tree).has(p), parent, "새 폴더", "");
     await vault.mkdir(path);
@@ -245,6 +341,9 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "o") (e.preventDefault(), setSwitcher(true));
+      else if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "p") (e.preventDefault(), setPalette(true));
+      else if (mod && !e.altKey && e.shiftKey && e.key.toLowerCase() === "f") (e.preventDefault(), openSearch());
+      else if (mod && !e.altKey && !e.shiftKey && e.key === ",") (e.preventDefault(), setSettingsOpen(true));
       else if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "g") (e.preventDefault(), void setView(view === "graph" ? "note" : "graph"));
       else if (mod && !e.altKey && e.key.toLowerCase() === "e") (e.preventDefault(), setMode(mode === "reading" ? "live" : "reading"));
       else if (e.altKey && !mod && e.key === "ArrowLeft") (e.preventDefault(), nav.back());
@@ -253,7 +352,37 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [mode, nav, view, setView]);
+  }, [mode, nav, view, setView, openSearch]);
+
+  // ---------------------------------------------------------------- commands
+
+  const commands = useMemo(() => {
+    const list: { id: string; label: string; detail?: string; run: () => void }[] = [
+      { id: "switcher", label: "빠른 전환: 노트 열기", detail: "Ctrl/Cmd+O", run: () => setSwitcher(true) },
+      { id: "search", label: "검색: 볼트 전체에서 찾기", detail: "Ctrl/Cmd+Shift+F", run: () => openSearch() },
+      { id: "new-note", label: "새 노트 만들기", run: () => void createAndOpen("Untitled", active).then(setRenaming) },
+      { id: "new-folder", label: "새 폴더 만들기", run: () => void newFolder("") },
+      { id: "daily", label: "오늘의 일일 노트 열기", run: () => void openDaily() },
+      { id: "template", label: "템플릿 삽입", run: () => void chooseTemplate() },
+      { id: "add-property", label: "속성 추가", run: () => (setShowRight(true), setViewState("note"), setAddPropertyNonce((n) => n + 1)) },
+      { id: "graph", label: view === "graph" ? "그래프 닫고 노트로 돌아가기" : "그래프 보기", detail: "Ctrl/Cmd+G", run: () => void setView(view === "graph" ? "note" : "graph") },
+      { id: "mode-live", label: "보기 모드: 편집", run: () => setMode("live") },
+      { id: "mode-source", label: "보기 모드: 소스", run: () => setMode("source") },
+      { id: "mode-reading", label: "보기 모드: 읽기", detail: "Ctrl/Cmd+E", run: () => setMode("reading") },
+      { id: "left", label: showLeft ? "왼쪽 사이드바 숨기기" : "왼쪽 사이드바 보기", run: () => setShowLeft(!showLeft) },
+      { id: "right", label: showRight ? "오른쪽 패널 숨기기" : "오른쪽 패널 보기", run: () => setShowRight(!showRight) },
+      { id: "tab-files", label: "파일 탐색기 보기", run: () => (setLeftTab("files"), setShowLeft(true)) },
+      { id: "tab-tags", label: "태그 목록 보기", run: () => (setLeftTab("tags"), setShowLeft(true)) },
+      { id: "back", label: "뒤로 가기", detail: "Alt+←", run: nav.back },
+      { id: "forward", label: "앞으로 가기", detail: "Alt+→", run: nav.forward },
+      { id: "sync", label: "구글 드라이브 동기화 열기", run: () => setSyncDialog(true) },
+      { id: "settings", label: "설정", detail: "Ctrl/Cmd+,", run: () => setSettingsOpen(true) },
+    ];
+    if (active) list.splice(3, 0, { id: "delete", label: "현재 노트 삭제", run: () => void remove(active) });
+    return list;
+    // The actions close over current state, so rebuild whenever the palette is about to be shown.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [palette, active, view, showLeft, showRight, nav.back, nav.forward]);
 
   // ------------------------------------------------------------------ render
 
@@ -269,6 +398,9 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
           <div className="sidebar-tabs">
             <button className={leftTab === "files" ? "active" : ""} onClick={() => setLeftTab("files")}>
               파일
+            </button>
+            <button className={leftTab === "search" ? "active" : ""} onClick={() => openSearch()}>
+              검색
             </button>
             <button className={leftTab === "tags" ? "active" : ""} onClick={() => setLeftTab("tags")}>
               태그
@@ -299,6 +431,8 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
                 />
               )}
             </>
+          ) : leftTab === "search" ? (
+            <SearchPane index={index} query={searchQuery} onQuery={setSearchQuery} focusNonce={searchFocus} onOpen={showNote} />
           ) : (
             <TagPane index={index} selected={selectedTag} onSelect={setSelectedTag} onOpen={openNote} />
           )}
@@ -319,6 +453,9 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
           <button title="빠른 전환 (Ctrl/Cmd+O)" onClick={() => setSwitcher(true)}>
             🔍
           </button>
+          <button title="명령 팔레트 (Ctrl/Cmd+P)" onClick={() => setPalette(true)}>
+            ⌘
+          </button>
           <button title="그래프 보기 (Ctrl/Cmd+G)" className={view === "graph" ? "active" : ""} aria-pressed={view === "graph"} onClick={() => void setView(view === "graph" ? "note" : "graph")}>
             ◎
           </button>
@@ -336,6 +473,9 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
               </button>
             ))}
           </div>
+          <button title="설정 (Ctrl/Cmd+,)" onClick={() => setSettingsOpen(true)}>
+            ⚙
+          </button>
           <button title="오른쪽 패널" className={showRight ? "active" : ""} onClick={() => setShowRight(!showRight)}>
             ⓘ
           </button>
@@ -363,6 +503,8 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
               onOpenLink={(l, from) => void openLink(l, from)}
               onOpenTag={openTag}
               onSaveState={setSaveState}
+              attachmentFolder={settings.attachmentFolder}
+              notify={say}
             />
           </>
         ) : (
@@ -382,6 +524,8 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
           onOpen={openNote}
           onCreate={(target, from) => void openLink({ target }, from)}
           onTag={openTag}
+          onEditNote={(edit) => void editNote(edit)}
+          addPropertyNonce={addPropertyNonce}
         />
       )}
 
@@ -401,6 +545,31 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
           onCreate={(name) => (setSwitcher(false), void createAndOpen(name, active))}
         />
       )}
+
+      {palette && (
+        <ListPicker
+          title="명령 팔레트"
+          placeholder="명령 입력…"
+          items={commands}
+          onClose={() => setPalette(false)}
+          onChoose={(id) => {
+            setPalette(false);
+            commands.find((c) => c.id === id)?.run();
+          }}
+        />
+      )}
+
+      {templatePicker && (
+        <ListPicker
+          title="템플릿 삽입"
+          placeholder="템플릿 이름 입력…"
+          items={templatePicker}
+          onClose={() => setTemplatePicker(null)}
+          onChoose={(id) => void insertTemplate(id)}
+        />
+      )}
+
+      {settingsOpen && <SettingsDialog settings={settings} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
 
       {menu && (
         <ul className="context-menu" style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()}>
