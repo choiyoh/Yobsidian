@@ -5,6 +5,7 @@ import { buildTree, dirname, extname, isMarkdown, isWithin, joinPath, stem, type
 import { detectPlatform } from "@/core/platform";
 import type { EditorMode, LinkTarget } from "@/features/editor/env";
 import { NoteEditor, type NoteEditorHandle, type SaveState } from "@/features/editor/NoteEditor";
+import { GraphView } from "@/features/graph/GraphView";
 import { RightPanel } from "@/features/panels/RightPanel";
 import { TagPane } from "@/features/panels/TagPane";
 import { SyncBadge } from "@/features/sync/SyncBadge";
@@ -74,6 +75,7 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [showLeft, setShowLeft] = useState(true);
   const [showRight, setShowRight] = useState(() => window.innerWidth > 1000);
+  const [view, setViewState] = useState<"note" | "graph">("note");
   const [switcher, setSwitcher] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; node: TreeNode } | null>(null);
@@ -88,6 +90,12 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
     setToast(message);
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(null), 3500);
+  }, []);
+
+  // The editor unmounts behind the graph, so save pending edits first.
+  const setView = useCallback(async (v: "note" | "graph") => {
+    await editor.current?.flush();
+    setViewState(v);
   }, []);
 
   const setMode = (m: EditorMode) => {
@@ -237,6 +245,7 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "o") (e.preventDefault(), setSwitcher(true));
+      else if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "g") (e.preventDefault(), void setView(view === "graph" ? "note" : "graph"));
       else if (mod && !e.altKey && e.key.toLowerCase() === "e") (e.preventDefault(), setMode(mode === "reading" ? "live" : "reading"));
       else if (e.altKey && !mod && e.key === "ArrowLeft") (e.preventDefault(), nav.back());
       else if (e.altKey && !mod && e.key === "ArrowRight") (e.preventDefault(), nav.forward());
@@ -244,7 +253,7 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [mode, nav]);
+  }, [mode, nav, view, setView]);
 
   // ------------------------------------------------------------------ render
 
@@ -310,6 +319,9 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
           <button title="빠른 전환 (Ctrl/Cmd+O)" onClick={() => setSwitcher(true)}>
             🔍
           </button>
+          <button title="그래프 보기 (Ctrl/Cmd+G)" className={view === "graph" ? "active" : ""} aria-pressed={view === "graph"} onClick={() => void setView(view === "graph" ? "note" : "graph")}>
+            ◎
+          </button>
           <span className="spacer" />
           <div className="mode-switch" role="group" aria-label="보기 모드">
             {(
@@ -329,7 +341,16 @@ function Workspace({ vault }: { vault: VaultAdapter }) {
           </button>
         </header>
 
-        {active ? (
+        {view === "graph" ? (
+          <GraphView
+            index={index}
+            activePath={active}
+            onOpen={(path, keepGraph) => {
+              openNote(path);
+              if (!keepGraph) setViewState("note");
+            }}
+          />
+        ) : active ? (
           <>
             <TitleInput key={active} value={stem(active)} onCommit={(name) => void rename(active, name)} />
             <NoteEditor

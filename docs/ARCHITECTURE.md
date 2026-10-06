@@ -22,7 +22,7 @@
 | 화면 | **React 19 + TypeScript + Vite** | 웹 빌드와 데스크톱이 같은 번들을 씀 |
 | 편집기 | **CodeMirror 6** (2단계) | 옵시디언도 CM6 기반. 라이브 프리뷰를 데코레이션으로 구현 가능 |
 | 마크다운 해석 | `@lezer/markdown`(편집기) + `remark`/`unified`(인덱싱·읽기 모드) | 위키링크·태그·임베드는 확장 문법으로 추가 |
-| 그래프 | Canvas/WebGL 포스 레이아웃 (`d3-force` + `pixi.js` 또는 `sigma.js`, 3단계에서 확정) | 노트 수천 개에서도 부드럽게 |
+| 그래프 | 직접 만든 Barnes-Hut 포스 레이아웃 + Canvas 2D (외부 라이브러리 없음) | 노트 4000개에서도 틱당 약 16ms. 번들 크기를 늘리지 않고 웹/데스크톱 동작이 같음 |
 | 로컬 캐시(웹) | IndexedDB | 오프라인 편집, 빠른 시작 |
 | 동기화 | Google Drive API v3 (REST, `fetch` 직접 호출) | 웹과 데스크톱이 같은 코드 사용 |
 | 테스트 | Vitest | Vite와 설정 공유 |
@@ -83,7 +83,7 @@ src/
     panels/                백링크·나가는 링크·태그·개요 패널, 태그 목록
     switcher/              빠른 전환 (Ctrl/Cmd+O)
     sync/                  동기화 상태 표시줄, 볼트·드라이브 대화 상자, 드라이브 폴더 선택기
-    graph/                 (3단계)
+    graph/                 그래프 뷰 (3단계): model.ts(필터·깊이·색상 그룹), simulation.ts(Barnes-Hut 포스 레이아웃), GraphCanvas.tsx(캔버스 렌더·줌/팬), GraphView.tsx(전체/로컬 그래프 화면)
 src-tauri/                 데스크톱 셸 (Rust). 네이티브 기능은 플러그인·커맨드로 추가
 docs/                      설계 문서
 ```
