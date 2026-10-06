@@ -289,6 +289,132 @@ button {
   text-align: center;
 }
 
+/* -------------------------------------------------------------- graph */
+
+.graph-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.graph-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.graph-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.graph-field input[type="range"] {
+  width: 90px;
+}
+.graph-field select,
+.graph-search {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 6px;
+}
+.graph-search {
+  width: 220px;
+  max-width: 100%;
+}
+.graph-controls .mode-switch button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.graph-stage,
+.local-graph-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.graph-canvas-wrap {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.graph-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+.graph-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  margin: 0;
+}
+.graph-hint {
+  position: absolute;
+  left: 12px;
+  bottom: 8px;
+  margin: 0;
+  font-size: 11px;
+  pointer-events: none;
+}
+.graph-legend {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  max-height: calc(100% - 40px);
+  overflow: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.graph-legend button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+}
+.graph-legend button:hover {
+  background: var(--accent-soft);
+}
+.graph-legend .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+.local-graph {
+  margin: 4px 0;
+}
+.local-graph-stage {
+  height: 200px;
+  flex: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.local-graph .graph-field {
+  margin-top: 4px;
+}
+
 /* -------------------------------------------------------- right panel */
 
 .section {
