@@ -2,7 +2,7 @@ import { EditorView } from "@codemirror/view";
 
 /** Layout-level editor theme. Colors come from the app's CSS variables so light/dark follow the system. */
 export const editorTheme = EditorView.theme({
-  "&": { height: "100%", color: "var(--text)", backgroundColor: "transparent" },
+  "&": { height: "100%", fontSize: "var(--editor-font-size, 16px)", color: "var(--text)", backgroundColor: "transparent" },
   "&.cm-focused": { outline: "none" },
   ".cm-scroller": { fontFamily: "var(--font-text)", lineHeight: "1.7", overflow: "auto" },
   ".cm-content": { maxWidth: "760px", margin: "0 auto", padding: "8px 40px 40vh", caretColor: "var(--accent)" },

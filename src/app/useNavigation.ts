@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 export interface Location {
   path: string;
   /** Where to scroll to after opening. `nonce` makes repeat jumps to the same heading fire again. */
-  reveal?: { heading?: string; block?: string; nonce: number };
+  reveal?: { heading?: string; block?: string; line?: number; nonce: number };
 }
 
 interface Stack {
@@ -17,7 +17,7 @@ let nonce = 0;
 export function useNavigation(initial: string | null) {
   const [stack, setStack] = useState<Stack>({ entries: initial ? [{ path: initial }] : [], pos: initial ? 0 : -1 });
 
-  const go = useCallback((path: string, reveal?: { heading?: string; block?: string }) => {
+  const go = useCallback((path: string, reveal?: { heading?: string; block?: string; line?: number }) => {
     setStack((s) => {
       const loc: Location = { path, reveal: reveal ? { ...reveal, nonce: ++nonce } : undefined };
       const current = s.entries[s.pos];

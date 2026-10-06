@@ -7,6 +7,7 @@ import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import { EditorView, drawSelection, highlightSpecialChars, keymap } from "@codemirror/view";
 import { classHighlighter } from "@lezer/highlight";
 import { GFM } from "@lezer/markdown";
+import { attachmentHandlers } from "./attachments";
 import { editorEnv, editorMode, type EditorEnv, type EditorMode } from "./env";
 import { frontmatterExtension } from "./frontmatter";
 import { livePreview } from "./live-preview";
@@ -64,6 +65,7 @@ export function createExtensions(env: EditorEnv, mode: EditorMode, onSave: () =>
     markdown({ base: markdownLanguage, extensions: [GFM, frontmatterExtension], codeLanguages: languages }),
     syntaxHighlighting(classHighlighter),
     livePreview,
+    attachmentHandlers,
     EditorView.lineWrapping,
     editorTheme,
     keymap.of([

@@ -115,6 +115,7 @@ export function GraphCanvas({ model, activePath, colorMode, fitKey, positions, a
     const dark = window.matchMedia("(prefers-color-scheme: dark)");
     const onScheme = () => ((L.theme = readTheme(box)), schedule());
     dark.addEventListener("change", onScheme);
+    window.addEventListener("yobsidian:theme", onScheme);
 
     // -------------------------------------------------------------- drawing
     function frame() {
@@ -351,6 +352,7 @@ export function GraphCanvas({ model, activePath, colorMode, fitKey, positions, a
       if (sim) L.model.nodes.forEach((n, i) => positions.current.set(n.path, { x: sim.x[i], y: sim.y[i] }));
       ro.disconnect();
       dark.removeEventListener("change", onScheme);
+      window.removeEventListener("yobsidian:theme", onScheme);
       cv.removeEventListener("wheel", onWheel);
       cv.removeEventListener("pointerdown", onDown);
       cv.removeEventListener("pointermove", onMove);

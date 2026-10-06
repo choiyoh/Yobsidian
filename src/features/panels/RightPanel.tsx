@@ -3,6 +3,7 @@ import type { NoteIndex } from "@/core/index";
 import { stem } from "@/core/vault";
 import { useIndexVersion } from "@/app/useIndexVersion";
 import { LocalGraph } from "@/features/graph/GraphView";
+import { PropertiesPane } from "./PropertiesPane";
 
 interface Props {
   index: NoteIndex;
@@ -10,10 +11,13 @@ interface Props {
   onOpen(path: string, reveal?: { heading?: string }): void;
   onCreate(target: string, from: string): void;
   onTag(tag: string): void;
+  onEditNote(edit: (text: string) => string): void;
+  /** Bumped by the "add property" command to open the new-property row. */
+  addPropertyNonce: number;
 }
 
 /** Backlinks, outgoing links, tags and outline of the open note. */
-export function RightPanel({ index, path, onOpen, onCreate, onTag }: Props) {
+export function RightPanel({ index, path, onOpen, onCreate, onTag, onEditNote, addPropertyNonce }: Props) {
   const version = useIndexVersion(index);
   const data = useMemo(() => {
     const backlinks = new Map<string, string[]>();
@@ -33,6 +37,8 @@ export function RightPanel({ index, path, onOpen, onCreate, onTag }: Props) {
 
   return (
     <aside className="panel right-panel">
+      <PropertiesPane index={index} path={path} onEdit={onEditNote} addNonce={addPropertyNonce} />
+
       <Section title="백링크" count={backlinkCount}>
         {data.backlinks.size === 0 && <p className="muted">이 노트를 가리키는 링크가 없어요</p>}
         {[...data.backlinks].map(([source, contexts]) => (

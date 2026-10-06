@@ -1,6 +1,7 @@
 import { Annotation, EditorState, Transaction } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { saveAttachment } from "@/core/attachments";
 import type { NoteIndex } from "@/core/index";
 import type { VaultAdapter } from "@/core/vault";
 import type { EditorEnv, EditorMode, LinkTarget } from "./env";
@@ -13,6 +14,10 @@ export interface NoteEditorHandle {
   /** Write any unsaved edits now. Await before renaming or deleting the open note. */
   flush(): Promise<void>;
   focus(): void;
+  /** Rewrite the note text (e.g. a front matter edit); only the changed span is replaced, and the result is saved right away. */
+  transform(fn: (text: string) => string): Promise<void>;
+  /** Insert text at the cursor (or replace the selection). */
+  insert(text: string): void;
 }
 
 interface Props {
@@ -20,10 +25,13 @@ interface Props {
   index: NoteIndex;
   path: string;
   mode: EditorMode;
-  reveal?: { heading?: string; block?: string; nonce: number };
+  reveal?: { heading?: string; block?: string; line?: number; nonce: number };
   onOpenLink(link: LinkTarget, from: string): void;
   onOpenTag(tag: string): void;
   onSaveState(state: SaveState): void;
+  /** Folder setting for pasted/dropped files; blank follows the vault's Obsidian config. */
+  attachmentFolder: string;
+  notify(message: string): void;
 }
 
 const SAVE_DELAY_MS = 600;
@@ -67,7 +75,29 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     return s.saving;
   };
 
-  useImperativeHandle(ref, () => ({ flush, focus: () => view.current?.focus() }));
+  const transform = async (fn: (text: string) => string) => {
+    const v = view.current;
+    if (!v) return;
+    const before = v.state.doc.toString();
+    const after = fn(before);
+    if (after === before) return;
+    let from = 0;
+    while (from < before.length && from < after.length && before[from] === after[from]) from++;
+    let endOld = before.length;
+    let endNew = after.length;
+    while (endOld > from && endNew > from && before[endOld - 1] === after[endNew - 1]) (endOld--, endNew--);
+    v.dispatch({ changes: { from, to: endOld, insert: after.slice(from, endNew) }, userEvent: "input" });
+    await flush();
+  };
+
+  const insert = (text: string) => {
+    const v = view.current;
+    if (!v) return;
+    v.dispatch({ ...v.state.replaceSelection(text), userEvent: "input.paste", scrollIntoView: true });
+    v.focus();
+  };
+
+  useImperativeHandle(ref, () => ({ flush, focus: () => view.current?.focus(), transform, insert }));
 
   const revealIn = (v: EditorView, path: string, reveal: Props["reveal"]) => {
     if (!reveal) return;
@@ -77,6 +107,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       const want = reveal.heading.trim().toLowerCase();
       const h = latest.current.index.headingsOf(path).find((x) => x.text.toLowerCase() === want);
       if (h && h.line < doc.lines) pos = doc.line(h.line + 1).from;
+    } else if (reveal.line !== undefined) {
+      pos = doc.line(Math.min(Math.max(reveal.line + 1, 1), doc.lines)).from;
     } else if (reveal.block) {
       const marker = "^" + reveal.block;
       for (let n = 1; n <= doc.lines && pos === null; n++) if (doc.line(n).text.trimEnd().endsWith(marker)) pos = doc.line(n).from;
@@ -124,6 +156,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         openLink: (link) => latest.current.onOpenLink(link, path),
         openUrl: (url) => window.open(url, "_blank", "noopener,noreferrer"),
         openTag: (tag) => latest.current.onOpenTag(tag),
+        saveAttachment: (file) => saveAttachment(vault, index, { ...file, fromPath: path, folderSetting: latest.current.attachmentFolder }),
+        notify: (message) => latest.current.notify(message),
       };
       const onChange = () => {
         if (s.path !== path) return;

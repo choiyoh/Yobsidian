@@ -2,6 +2,8 @@ import { basename, isHidden, isMarkdown, stem } from "../vault/paths";
 import type { VaultAdapter, VaultEntry } from "../vault/types";
 import { parseNote, type ParsedHeading, type ParsedLink, type ParsedNote } from "./parse";
 import { linkTextFor, resolveLink, type ResolveContext } from "./resolve";
+import { readProperties, type Property } from "./properties";
+import { searchDocs, type SearchOptions, type SearchResult } from "../search/search";
 
 export interface ResolvedLink extends ParsedLink {
   /** Path of the file this link points at, or `null` if no such file exists (yet). */
@@ -24,6 +26,9 @@ export interface GraphData {
 
 interface NoteRecord extends ParsedNote {
   lines: string[];
+  /** Lowercased full text, kept for full-text search. */
+  lower: string;
+  properties: Property[];
 }
 
 /**
@@ -184,6 +189,11 @@ export class NoteIndex implements ResolveContext {
     return this.notes.get(path)?.tags ?? [];
   }
 
+  /** Typed front matter properties of a note. */
+  propertiesOf(path: string): Property[] {
+    return this.notes.get(path)?.properties ?? [];
+  }
+
   headingsOf(path: string): ParsedHeading[] {
     return this.notes.get(path)?.headings ?? [];
   }
@@ -221,6 +231,17 @@ export class NoteIndex implements ResolveContext {
     return results.slice(0, limit).map(({ score: _score, ...r }) => r);
   }
 
+  /** Full-text search over every note; see `core/search/query.ts` for the syntax. */
+  searchContent(query: string, opts?: SearchOptions): SearchResult[] {
+    return searchDocs(
+      (function* (notes: Map<string, NoteRecord>) {
+        for (const [path, rec] of notes) yield { path, lines: rec.lines, lower: rec.lower, tags: rec.tags };
+      })(this.notes),
+      query,
+      opts,
+    );
+  }
+
   /** Whole-vault link graph, for the graph view. */
   graph(): GraphData {
     const nodes = this.notePaths().map((path) => ({ path, name: stem(path), tags: this.tagsOf(path) }));
@@ -256,7 +277,7 @@ export class NoteIndex implements ResolveContext {
 }
 
 function toRecord(text: string): NoteRecord {
-  return { ...parseNote(text), lines: text.split(/\r?\n/) };
+  return { ...parseNote(text), lines: text.split(/\r?\n/), lower: text.toLowerCase(), properties: readProperties(text) };
 }
 
 function stamp(e: VaultEntry): string {

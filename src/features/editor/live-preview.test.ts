@@ -17,7 +17,7 @@ async function decorate(doc: string, opts: { cursor?: number; mode?: EditorMode;
   const vault = new MemoryAdapter("t", { "Cur.md": doc, "Other.md": "# Head\n", "pic.png": "x", ...opts.files });
   const index = new NoteIndex();
   await index.load(vault);
-  const env: EditorEnv = { index, vault, path: "Cur.md", openLink() {}, openUrl() {}, openTag() {} };
+  const env: EditorEnv = { index, vault, path: "Cur.md", openLink() {}, openUrl() {}, openTag() {}, saveAttachment: async () => "", notify() {} };
   const state = EditorState.create({
     doc,
     selection: EditorSelection.single(Math.min(opts.cursor ?? doc.length, doc.length)),
