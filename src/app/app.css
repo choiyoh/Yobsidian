@@ -1014,3 +1014,24 @@ button {
   padding: 4px 14px;
   cursor: pointer;
 }
+.cm-table-wrap {
+  overflow-x: auto;
+  margin: 0.4em 0;
+}
+.cm-table {
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+.cm-table th,
+.cm-table td {
+  border: 1px solid var(--border, rgba(128, 128, 128, 0.35));
+  padding: 4px 10px;
+  vertical-align: top;
+}
+.cm-table th {
+  font-weight: 600;
+  background: var(--code-bg);
+}
+.cm-table img {
+  max-width: 100%;
+}

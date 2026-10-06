@@ -117,3 +117,25 @@ describe("live preview decorations", () => {
     expect(items).toContainEqual({ text: "# ", kind: "hide" });
   });
 });
+
+describe("tables", () => {
+  const table = "| a | b |\n|:--|--:|\n| **x** | [[Other\\|o]] |\n";
+  it("renders a table widget away from the cursor", async () => {
+    const items = await decorate(table + "\nafter", { cursor: table.length + 3 });
+    expect(items.filter((i) => i.kind === "TableWidget")).toHaveLength(1);
+    expect(items.some((i) => i.kind === "cm-strong" || i.kind === "WikilinkWidget")).toBe(false);
+  });
+  it("keeps the source editable while the cursor is inside", async () => {
+    const items = await decorate(table, { cursor: 3 });
+    expect(items.some((i) => i.kind === "TableWidget")).toBe(false);
+    expect(items).toContainEqual({ text: "", kind: "line:cm-table-line" });
+  });
+  it("keeps source mode raw", async () => {
+    const items = await decorate(table + "\nx", { mode: "source" });
+    expect(items.some((i) => i.kind === "TableWidget")).toBe(false);
+  });
+  it("renders tables without outer pipes", async () => {
+    const items = await decorate("a | b\n--- | ---\n1 | 2\n\nend", { cursor: 25 });
+    expect(items.some((i) => i.kind === "TableWidget")).toBe(true);
+  });
+});
