@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { NoteIndex } from "@/core/index";
 import { stem } from "@/core/vault";
 import { useIndexVersion } from "@/app/useIndexVersion";
+import { LocalGraph } from "@/features/graph/GraphView";
 
 interface Props {
   index: NoteIndex;
@@ -66,6 +67,11 @@ export function RightPanel({ index, path, onOpen, onCreate, onTag }: Props) {
           ))}
         </ul>
       </Section>
+
+      <details className="section" open>
+        <summary>로컬 그래프</summary>
+        <LocalGraph index={index} path={path} onOpen={(p) => onOpen(p)} />
+      </details>
 
       <Section title="태그" count={data.tags.length}>
         {data.tags.length === 0 && <p className="muted">태그가 없어요</p>}
