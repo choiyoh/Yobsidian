@@ -1,46 +1,60 @@
 import { MemoryAdapter } from "./memory-adapter";
 
-/**
- * A small in-memory vault so the app has something to show before real
- * storage (local folder, Google Drive) is wired up.
- */
-export function createSampleVault(): MemoryAdapter {
-  return new MemoryAdapter("Sample Vault", {
-    "Welcome.md": `# Yobsidian에 오신 걸 환영해요
+/** Notes a brand-new web vault starts with, so there is something to click through. */
+export const SAMPLE_FILES: Record<string, string> = {
+  "Welcome.md": `---
+tags: [welcome]
+aliases: [Start, 시작]
+---
+# Yobsidian에 오신 걸 환영해요
 
-이 화면은 앱 뼈대예요. 왼쪽 파일 목록은 **저장소 추상화**(VaultAdapter)를 통해 읽은 것이고,
-지금은 메모리 안의 샘플 볼트를 보여주고 있어요.
+옵시디언과 같은 규칙으로 동작하는 노트 앱이에요. 아래를 직접 해보세요.
 
-- 편집기와 [[Links|위키링크]]는 다음 단계에서 만들어요.
-- 그래프 뷰는 [[Graph view]] 노트를 참고하세요.
-- 구글 드라이브 연동은 [[Roadmap]]에 있어요.
+- **라이브 프리뷰**: 커서가 없는 줄은 서식이 적용돼 보이고, 커서를 올리면 마크다운 원문이 나타나요.
+- **위키링크**: [[Links|여기를 눌러]] 노트를 열어 보세요. [[아직 없는 노트]]를 누르면 새로 만들어져요.
+- \`[[\`를 입력하면 노트 이름이 자동완성돼요. \`[[Roadmap#\`처럼 \`#\`를 붙이면 제목을 골라요.
+- 오른쪽 패널에서 **백링크**와 **개요**를 볼 수 있어요. 빠른 전환은 \`Ctrl/Cmd + O\`.
+- 할 일: 
+  - [x] 노트 열기
+  - [ ] 체크박스 눌러 보기
 
 #yobsidian #welcome
 `,
-    "Roadmap.md": `---
+  "Roadmap.md": `---
 tags: [plan]
 ---
 # Roadmap
 
+## 단계
 1. 설계와 프로젝트 뼈대
 2. 마크다운 편집기, [[Links|위키링크]], 백링크, 태그
 3. [[Graph view]]
 4. 구글 드라이브 싱크와 배포
-`,
-    "Concepts/Links.md": `# Links
 
-옵시디언 문법을 그대로 써요: \`[[노트]]\`, \`[[노트|별칭]]\`, \`[[노트#제목]]\`, \`![[이미지.png]]\`.
-
-돌아가기: [[Welcome]]
+## 메모
+처음으로 돌아가기: [[Welcome]]
 `,
-    "Concepts/Graph view.md": `# Graph view
+  "Concepts/Links.md": `# Links
 
-노트 사이의 링크를 노드 그래프로 보여줘요. 링크: [[Links]], [[Roadmap]]
+옵시디언 문법을 그대로 써요: \`[[노트]]\`, \`[[노트|별칭]]\`, \`[[노트#제목]]\`, \`![[Roadmap#단계]]\`.
+
+![[Roadmap#단계]]
+
+돌아가기: [[Welcome]] #concepts/links
 `,
-    "Daily/2026-10-06.md": `# 2026-10-06
+  "Concepts/Graph view.md": `# Graph view
+
+노트 사이의 링크를 노드 그래프로 보여줘요(3단계). 링크: [[Links]], [[Roadmap]]
+`,
+  "Daily/2026-10-06.md": `# 2026-10-06
 
 - 프로젝트 시작 → [[Roadmap]]
 `,
-    ".obsidian/app.json": `{ "attachmentFolderPath": "attachments" }\n`,
-  });
+};
+
+/**
+ * A small in-memory vault for tests and demos.
+ */
+export function createSampleVault(): MemoryAdapter {
+  return new MemoryAdapter("Sample Vault", { ...SAMPLE_FILES, ".obsidian/app.json": `{ "attachmentFolderPath": "attachments" }\n` });
 }

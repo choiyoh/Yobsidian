@@ -65,13 +65,18 @@ src/
       tree.ts              탐색기 트리 생성
       memory-adapter.ts    메모리 구현 (샘플·테스트·기준 구현)
       fs-adapter.ts        (4단계) Tauri 로컬 파일 시스템
-      idb-adapter.ts       (4단계) IndexedDB
+      idb-adapter.ts       IndexedDB (웹 로컬 볼트. 메모리 어댑터에 쓰기 반영 방식)
       drive-adapter.ts     (4단계) Google Drive
-    index/                 (2단계) 링크·태그·프런트매터 인덱스, 링크 해석
+    index/                 링크·태그·프런트매터 인덱스 (2단계)
+      parse.ts             위키링크·임베드·태그·프런트매터·제목 파서 (순수 함수)
+      resolve.ts           링크 해석 (최단 경로 우선, 별칭), 링크 텍스트 생성
+      note-index.ts        NoteIndex: 링크/백링크/태그/검색, graph()는 3단계 그래프 뷰가 그대로 사용
+    notes.ts               노트 생성, 이름 변경·이동 시 링크 자동 갱신, 휴지통(.trash)
     sync/                  (4단계) 동기화 엔진
   features/
-    editor/                (2단계) CodeMirror 6 편집기, 라이브 프리뷰
-    backlinks/             (2단계)
+    editor/                CodeMirror 6 편집기: 라이브 프리뷰, 위키링크 자동완성·클릭 이동, 자동 저장 (2단계)
+    panels/                백링크·나가는 링크·태그·개요 패널, 태그 목록
+    switcher/              빠른 전환 (Ctrl/Cmd+O)
     graph/                 (3단계)
 src-tauri/                 데스크톱 셸 (Rust). 네이티브 기능은 플러그인·커맨드로 추가
 docs/                      설계 문서
