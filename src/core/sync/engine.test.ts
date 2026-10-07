@@ -281,6 +281,21 @@ describe("deletions", () => {
   });
 });
 
+describe("moves", () => {
+  it("propagates a note moved into a folder, and a folder moved into another", async () => {
+    await env.vault.writeText("a.md", "A");
+    await env.vault.writeText("dir/b.md", "B");
+    await env.vault.mkdir("target");
+    await env.sync();
+
+    await env.vault.rename("a.md", "target/a.md");
+    await env.vault.rename("dir", "target/dir");
+    await env.sync();
+    expect(env.drive.tree(env.root)).toEqual(["target/", "target/a.md", "target/dir/", "target/dir/b.md"]);
+    expect((await env.sync()).uploaded).toBe(0);
+  });
+});
+
 describe("what does not sync", () => {
   it("skips .trash, Obsidian's window layout, VCS and OS files, but syncs the rest of .obsidian", async () => {
     for (const p of [".trash/x.md", ".obsidian/workspace.json", ".obsidian/workspace-mobile.json", ".git/HEAD", "Thumbs.db", "a/.DS_Store", "ok.md", ".obsidian/app.json", ".obsidian/plugins/p/data.json"]) {
