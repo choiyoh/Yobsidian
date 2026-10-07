@@ -78,4 +78,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           ls -l installers
-          gh release create "$GITHUB_REF_NAME" installers/* --repo "$GITHUB_REPOSITORY" --title "Yobsidian $GITHUB_REF_NAME" --generate-notes --notes "설치할 때 경고가 뜨면 [docs/DEPLOY.md](https://github.com/$GITHUB_REPOSITORY/blob/main/docs/DEPLOY.md)의 '설치 파일 열기'를 보세요. 서명하지 않은 앱이라 한 번은 경고가 나와요."
+          # A release may already exist (e.g. published from the GitHub web UI); then just attach the installers to it.
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" installers/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" installers/* --repo "$GITHUB_REPOSITORY" --title "Yobsidian $GITHUB_REF_NAME" --generate-notes --notes "설치할 때 경고가 뜨면 [docs/DEPLOY.md](https://github.com/$GITHUB_REPOSITORY/blob/main/docs/DEPLOY.md)의 '설치 파일 열기'를 보세요. 서명하지 않은 앱이라 한 번은 경고가 나와요."
+          fi
