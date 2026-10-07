@@ -50,7 +50,10 @@ jobs:
         with:
           workspaces: src-tauri
       - run: npm ci
+      # The desktop client secret lives in Settings > Secrets and variables > Actions > Secrets (never in the repo).
       - run: npx tauri build ${{ matrix.args }}
+        env:
+          VITE_GOOGLE_CLIENT_SECRET: ${{ secrets.VITE_GOOGLE_CLIENT_SECRET }}
       - uses: actions/upload-artifact@v4
         with:
           name: installer-${{ runner.os }}

@@ -119,6 +119,11 @@ describe("DesktopAuth", () => {
     const auth = new DesktopAuth({ settings: () => ({ clientId: "", clientSecret: "" }), invoke: async () => undefined as never, openUrl: async () => {}, fetch });
     await expect(auth.signIn()).rejects.toThrow(/클라이언트 ID/);
   });
+
+  it("explains what is missing when the client secret is empty", async () => {
+    const auth = new DesktopAuth({ settings: () => ({ clientId: "cid", clientSecret: "" }), invoke: async () => undefined as never, openUrl: async () => {}, fetch });
+    await expect(auth.signIn()).rejects.toThrow(/VITE_GOOGLE_CLIENT_SECRET/);
+  });
 });
 
 function web() {

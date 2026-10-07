@@ -50,6 +50,8 @@ export class DesktopAuth implements DriveAuth {
   async signIn() {
     const { clientId, clientSecret } = this.deps.settings();
     if (!clientId) throw new Error("Google 클라이언트 ID가 설정되지 않았어요");
+    if (!clientSecret)
+      throw new Error("이 설치 파일에는 Google 클라이언트 보안 비밀이 들어 있지 않아요. 빌드할 때 VITE_GOOGLE_CLIENT_SECRET을 넣거나(.env.local 또는 GitHub Actions Secret), ☁ 메뉴의 클라이언트 설정에서 직접 입력해 주세요. 자세한 방법은 docs/GOOGLE_SETUP.md를 보세요");
 
     const random = this.deps.randomBytes ?? ((n) => crypto.getRandomValues(new Uint8Array(n)));
     const verifier = base64url(random(32));
