@@ -31,7 +31,7 @@
 ### 구글 로그인 연결
 
 배포된 주소(경로 빼고 origin만, 예: `https://choiyoh.github.io` 또는 `https://yobsidian.pages.dev`)를 [구글 설정 가이드](GOOGLE_SETUP.md)의 **승인된 JavaScript 원본**에 추가하세요.
-클라이언트 ID를 빌드에 넣으려면 저장소 **변수** `VITE_GOOGLE_CLIENT_ID`에 적으면 돼요. (안 넣어도 앱 안의 ☁ 메뉴에서 입력할 수 있어요.) **클라이언트 보안 비밀은 웹 빌드에 넣지 마세요.**
+클라이언트 ID는 코드에 기본값이 들어 있어서 따로 설정하지 않아도 돼요. 다른 클라이언트를 쓰고 싶으면 저장소 **변수** `VITE_GOOGLE_CLIENT_ID`에 적으세요(비어 있으면 기본값을 써요). 앱 안의 ☁ 메뉴에서 입력한 값이 가장 우선해요. **클라이언트 보안 비밀은 웹 빌드에 넣지 마세요.**
 
 ### 설치하기와 오프라인
 
@@ -75,5 +75,5 @@ git push origin v0.2.0
 
 - [ ] 웹 호스트 고르기 → 위 "GitHub Pages로" 또는 "Cloudflare Pages로" 단계 따라 하기 (변수 `DEPLOY_TARGET`이 없으면 배포는 건너뛰어요)
 - [ ] 배포된 주소의 origin을 구글 클라이언트의 **승인된 JavaScript 원본**에 추가
-- [ ] (선택) 변수 `VITE_GOOGLE_CLIENT_ID` 추가
+- [ ] (선택) 변수 `VITE_GOOGLE_CLIENT_ID` 추가 (다른 클라이언트를 쓸 때만)
 - [ ] 첫 릴리스: 태그 `v0.1.0` 푸시 (`git tag v0.1.0 && git push origin v0.1.0`)
