@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { NoteIndex } from "@/core/index";
 import { useIndexVersion } from "@/app/useIndexVersion";
 import { GraphCanvas } from "./GraphCanvas";
-import { buildGraph, groupColor, groupOf, type ColorMode, type GraphFilter, type GraphModel } from "./model";
+import { buildGraph, DEFAULT_STYLE, groupColor, groupOf, sanitizeStyle, type ColorMode, type GraphFilter, type GraphModel, type GraphStyle } from "./model";
 
 interface Settings {
   scope: "global" | "local";
@@ -10,10 +10,11 @@ interface Settings {
   query: string;
   colorMode: ColorMode;
   showOrphans: boolean;
+  style: GraphStyle;
 }
 
 const KEY = "yobsidian.graph";
-const DEFAULTS: Settings = { scope: "global", depth: 2, query: "", colorMode: "folder", showOrphans: true };
+const DEFAULTS: Settings = { scope: "global", depth: 2, query: "", colorMode: "folder", showOrphans: true, style: DEFAULT_STYLE };
 
 function loadSettings(): Settings {
   try {
@@ -24,6 +25,7 @@ function loadSettings(): Settings {
       query: "",
       colorMode: raw.colorMode === "tag" || raw.colorMode === "none" || raw.colorMode === "folder" ? raw.colorMode : DEFAULTS.colorMode,
       showOrphans: raw.showOrphans ?? DEFAULTS.showOrphans,
+      style: sanitizeStyle(raw.style),
     };
   } catch {
     return DEFAULTS;
@@ -53,6 +55,8 @@ interface Props {
 export function GraphView({ index, activePath, onOpen }: Props) {
   const [settings, setSettings] = useState<Settings>(loadSettings);
   const set = (patch: Partial<Settings>) => setSettings((s) => ({ ...s, ...patch }));
+  const setStyle = (patch: Partial<GraphStyle>) => setSettings((s) => ({ ...s, style: { ...s.style, ...patch } }));
+  const [panelOpen, setPanelOpen] = useState(false);
   useEffect(() => {
     try {
       const { query: _q, ...rest } = settings;
@@ -124,10 +128,14 @@ export function GraphView({ index, activePath, onOpen }: Props) {
         <span className="muted">
           노트 {model.nodes.length} · 링크 {model.edges.length}
         </span>
+        <button className={"graph-gear" + (panelOpen ? " active" : "")} onClick={() => setPanelOpen((v) => !v)} title="그래프 설정" aria-label="그래프 설정" aria-expanded={panelOpen}>
+          ⚙
+        </button>
       </div>
 
       <div className="graph-stage">
-        <GraphCanvas model={model} activePath={activePath} colorMode={settings.colorMode} fitKey={fitKey} positions={positions} onOpen={onOpen} />
+        <GraphCanvas model={model} activePath={activePath} colorMode={settings.colorMode} fitKey={fitKey} positions={positions} style={settings.style} onOpen={onOpen} />
+        {panelOpen && <StylePanel style={settings.style} onChange={setStyle} onReset={() => set({ style: DEFAULT_STYLE })} />}
         {model.nodes.length === 0 && <p className="graph-empty muted">표시할 노트가 없어요</p>}
         {legend.length > 0 && (
           <ul className="graph-legend">
@@ -169,6 +177,39 @@ export function LocalGraph({ index, path, onOpen, fill = false }: { index: NoteI
           <input type="range" min={1} max={4} value={depth} onChange={(e) => setDepth(Number(e.target.value))} />
         </label>
       )}
+    </div>
+  );
+}
+
+function Slider({ label, value, min, max, step, onChange }: { label: string; value: number; min: number; max: number; step: number; onChange(v: number): void }) {
+  return (
+    <label className="graph-slider">
+      <span>{label}</span>
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </label>
+  );
+}
+
+/** Obsidian-style display and force settings, applied live. */
+function StylePanel({ style, onChange, onReset }: { style: GraphStyle; onChange(patch: Partial<GraphStyle>): void; onReset(): void }) {
+  return (
+    <div className="graph-panel" role="group" aria-label="그래프 설정">
+      <h4>표시</h4>
+      <Slider label="노드 크기" value={style.nodeSize} min={0.4} max={2.5} step={0.05} onChange={(v) => onChange({ nodeSize: v })} />
+      <Slider label="링크 두께" value={style.linkWidth} min={0.3} max={3} step={0.05} onChange={(v) => onChange({ linkWidth: v })} />
+      {/* The slider runs the opposite way to the threshold, so "right" always means "more labels". */}
+      <Slider label="라벨 표시" value={2.6 - style.labelZoom} min={0.1} max={2.5} step={0.05} onChange={(v) => onChange({ labelZoom: 2.6 - v })} />
+      <label className="graph-check">
+        <input type="checkbox" checked={style.arrows} onChange={(e) => onChange({ arrows: e.target.checked })} />
+        화살표
+      </label>
+      <h4>힘</h4>
+      <Slider label="링크 거리" value={style.linkDistance} min={10} max={140} step={1} onChange={(v) => onChange({ linkDistance: v })} />
+      <Slider label="반발력" value={style.repel} min={10} max={300} step={5} onChange={(v) => onChange({ repel: v })} />
+      <Slider label="중심으로 당기기" value={style.center} min={0} max={0.15} step={0.005} onChange={(v) => onChange({ center: v })} />
+      <button className="graph-reset" onClick={onReset}>
+        기본값으로
+      </button>
     </div>
   );
 }

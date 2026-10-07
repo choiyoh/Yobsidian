@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { ForceSimulation } from "./simulation";
-import { groupColor, groupOf, nodeRadius, type ColorMode, type GraphModel } from "./model";
+import { DEFAULT_STYLE, groupColor, groupOf, nodeRadius, type ColorMode, type GraphModel, type GraphStyle } from "./model";
 
 interface Props {
   model: GraphModel;
@@ -13,6 +13,7 @@ interface Props {
   positions: React.MutableRefObject<Map<string, { x: number; y: number }>>;
   /** Draw every label regardless of zoom (the small local graph). */
   alwaysLabels?: boolean;
+  style?: GraphStyle;
   onOpen(path: string, keepGraph: boolean): void;
 }
 
@@ -22,6 +23,7 @@ interface Theme {
   accent: string;
   bg: string;
   edge: string;
+  dark: boolean;
 }
 
 interface View {
@@ -36,11 +38,15 @@ function readTheme(el: HTMLElement): Theme {
   const css = getComputedStyle(el);
   const get = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
   const muted = get("--text-muted", "#888");
-  return { text: get("--text", "#222"), muted, accent: get("--accent", "#7c5cdb"), bg: get("--bg", "#fff"), edge: muted };
+  const bg = get("--bg", "#fff");
+  // Dark when the page background is dark, whichever way the theme was chosen.
+  const m = /^#([0-9a-f]{6})$/i.exec(bg);
+  const dark = m ? parseInt(m[1].slice(0, 2), 16) * 0.3 + parseInt(m[1].slice(2, 4), 16) * 0.59 + parseInt(m[1].slice(4, 6), 16) * 0.11 < 128 : false;
+  return { text: get("--text", "#222"), muted, accent: get("--accent", "#7c5cdb"), bg, edge: get("--text", "#222"), dark };
 }
 
 /** Canvas graph with zoom, pan, node dragging, hover highlighting and click to open. */
-export function GraphCanvas({ model, activePath, colorMode, fitKey, positions, alwaysLabels, onOpen }: Props) {
+export function GraphCanvas({ model, activePath, colorMode, fitKey, positions, alwaysLabels, style = DEFAULT_STYLE, onOpen }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   // Everything the draw loop needs lives in one mutable bag so frames never wait for React.
@@ -49,6 +55,10 @@ export function GraphCanvas({ model, activePath, colorMode, fitKey, positions, a
     sim: null as ForceSimulation | null,
     view: { k: 1, x: 0, y: 0 } as View,
     hover: -1,
+    /** Node whose neighbourhood is (or was just) highlighted, and how strongly (0-1), eased per frame. */
+    focus: -1,
+    fade: 0,
+    style,
     active: -1,
     colorMode,
     alwaysLabels: !!alwaysLabels,
@@ -66,6 +76,7 @@ export function GraphCanvas({ model, activePath, colorMode, fitKey, positions, a
   live.current.onOpen = onOpen;
   live.current.colorMode = colorMode;
   live.current.alwaysLabels = !!alwaysLabels;
+live.current.style = style;
 
   // ---------------------------------------------------------- one-time setup
   useEffect(() => {
@@ -131,8 +142,15 @@ export function GraphCanvas({ model, activePath, colorMode, fitKey, positions, a
         } while (n < 4 && performance.now() - t0 < 5 && !sim.settled);
         if (L.autoFit && L.ticks <= FIT_TICKS) fit();
       }
+      const target = L.hover >= 0 ? 1 : 0;
+      if (L.hover >= 0) L.focus = L.hover;
+      if (L.fade !== target) {
+        L.fade += (target - L.fade) * 0.3;
+        if (Math.abs(target - L.fade) < 0.02) L.fade = target;
+        if (L.fade === 0) L.focus = -1;
+      }
       draw();
-      if (sim && !sim.settled) schedule();
+      if ((sim && !sim.settled) || L.fade !== target) schedule();
     }
 
     function draw() {
@@ -144,22 +162,30 @@ export function GraphCanvas({ model, activePath, colorMode, fitKey, positions, a
       if (!sim || !sim.n) return;
       ctx.setTransform(dpr * view.k, 0, 0, dpr * view.k, dpr * view.x, dpr * view.y);
 
-      const hover = L.hover;
-      const focus = hover >= 0 ? new Set([hover, ...m.adjacency[hover]]) : null;
+      const st = L.style;
+      const hover = L.focus;
+      const fade = L.fade;
+      const focus = hover >= 0 && hover < sim.n && fade > 0 ? new Set([hover, ...m.adjacency[hover]]) : null;
+      const dim = 1 - fade * 0.88; // alpha of everything outside the hovered neighbourhood
+      const radius = (i: number) => nodeRadius(m.nodes[i].degree) * st.nodeSize;
       const mode = L.colorMode;
       const colors = new Map<string, string>();
+      // Ungrouped nodes get a soft neutral, like Obsidian's grey dots.
+      const neutral = theme.dark ? "#9a9aa6" : "#8b8b96";
       const colorOf = (i: number) => {
         const g = groupOf(m.nodes[i], mode);
-        if (g === null) return theme.muted;
+        if (g === null) return neutral;
         let c = colors.get(g);
         if (!c) colors.set(g, (c = groupColor(g)));
         return c;
       };
 
-      // Edges: faint ones in a single path, highlighted ones on top.
-      ctx.lineWidth = 1 / view.k;
+      // Edges: thin and faint in one path, the hovered node's links on top in the accent colour.
+      const base = (m.edges.length > 4000 ? 0.1 : 0.2) * (theme.dark ? 1 : 1.1);
+      ctx.lineCap = "round";
+      ctx.lineWidth = (st.linkWidth * 0.9) / view.k;
       ctx.strokeStyle = theme.edge;
-      ctx.globalAlpha = focus ? 0.06 : m.edges.length > 4000 ? 0.18 : 0.35;
+      ctx.globalAlpha = base * (1 - fade * 0.7);
       ctx.beginPath();
       for (const [s, t] of m.edges) {
         if (focus && (s === hover || t === hover)) continue;
@@ -168,8 +194,9 @@ export function GraphCanvas({ model, activePath, colorMode, fitKey, positions, a
       }
       ctx.stroke();
       if (focus) {
-        ctx.globalAlpha = 0.9;
+        ctx.globalAlpha = 0.85 * fade;
         ctx.strokeStyle = theme.accent;
+        ctx.lineWidth = (st.linkWidth * 1.3) / view.k;
         ctx.beginPath();
         for (const [s, t] of m.edges) {
           if (s !== hover && t !== hover) continue;
@@ -177,6 +204,27 @@ export function GraphCanvas({ model, activePath, colorMode, fitKey, positions, a
           ctx.lineTo(sim.x[t], sim.y[t]);
         }
         ctx.stroke();
+      }
+      if (st.arrows && m.edges.length <= 3000) {
+        ctx.fillStyle = theme.edge;
+        ctx.globalAlpha = Math.min(0.5, base * 2) * (1 - fade * 0.6);
+        const head = 5 / Math.sqrt(view.k) + 2;
+        ctx.beginPath();
+        for (const [s, t] of m.edges) {
+          const dx = sim.x[t] - sim.x[s];
+          const dy = sim.y[t] - sim.y[s];
+          const d = Math.hypot(dx, dy);
+          if (d < radius(t) + head) continue;
+          const ux = dx / d;
+          const uy = dy / d;
+          const tipX = sim.x[t] - ux * (radius(t) + 1);
+          const tipY = sim.y[t] - uy * (radius(t) + 1);
+          ctx.moveTo(tipX, tipY);
+          ctx.lineTo(tipX - ux * head + uy * head * 0.45, tipY - uy * head - ux * head * 0.45);
+          ctx.lineTo(tipX - ux * head - uy * head * 0.45, tipY - uy * head + ux * head * 0.45);
+          ctx.closePath();
+        }
+        ctx.fill();
       }
 
       // Nodes, skipping those off screen.
@@ -186,39 +234,53 @@ export function GraphCanvas({ model, activePath, colorMode, fitKey, positions, a
         vy1 = (height - view.y) / view.k;
       const visible: number[] = [];
       for (let i = 0; i < sim.n; i++) {
-        const r = nodeRadius(m.nodes[i].degree);
+        const r = radius(i);
         if (sim.x[i] + r < vx0 || sim.x[i] - r > vx1 || sim.y[i] + r < vy0 || sim.y[i] - r > vy1) continue;
         visible.push(i);
-        ctx.globalAlpha = focus && !focus.has(i) ? 0.15 : 1;
-        ctx.fillStyle = i === hover ? theme.accent : colorOf(i);
+        ctx.globalAlpha = focus && !focus.has(i) ? dim : 1;
+        ctx.fillStyle = i === L.active || i === hover ? theme.accent : colorOf(i);
         ctx.beginPath();
         ctx.arc(sim.x[i], sim.y[i], r, 0, Math.PI * 2);
         ctx.fill();
       }
       if (L.active >= 0 && L.active < sim.n) {
+        // The open note glows softly instead of wearing a hard ring.
         const i = L.active;
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = theme.accent;
-        ctx.lineWidth = 2 / view.k;
+        const r = radius(i);
+        const glow = r + 9;
+        const g = ctx.createRadialGradient(sim.x[i], sim.y[i], r * 0.6, sim.x[i], sim.y[i], glow);
+        g.addColorStop(0, theme.accent + "99");
+        g.addColorStop(1, theme.accent + "00");
+        ctx.globalAlpha = focus && !focus.has(i) ? dim : 1;
+        ctx.fillStyle = g;
         ctx.beginPath();
-        ctx.arc(sim.x[i], sim.y[i], nodeRadius(m.nodes[i].degree) + 3 / view.k, 0, Math.PI * 2);
-        ctx.stroke();
+        ctx.arc(sim.x[i], sim.y[i], glow, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = theme.accent;
+        ctx.beginPath();
+        ctx.arc(sim.x[i], sim.y[i], r, 0, Math.PI * 2);
+        ctx.fill();
       }
 
-      // Labels fade in with zoom; bigger nodes appear first.
+      // Labels fade in with zoom; bigger nodes appear first. A thin background-coloured outline keeps them readable over links.
       const fontPx = 12;
       ctx.font = `${fontPx / view.k}px ${getComputedStyle(cv).fontFamily}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      ctx.fillStyle = theme.text;
+      ctx.lineJoin = "round";
+      ctx.lineWidth = 3 / view.k;
       for (const i of visible) {
-        const r = nodeRadius(m.nodes[i].degree);
-        let a = L.alwaysLabels ? 1 : Math.min(1, Math.max(0, (view.k * (0.6 + r * 0.1) - 0.8) / 0.6));
+        const r = radius(i);
+        let a = L.alwaysLabels ? 1 : Math.min(1, Math.max(0, (view.k * (0.6 + r * 0.1) - st.labelZoom) / 0.6));
         if (i === hover || i === L.active) a = 1;
-        if (focus) a = focus.has(i) ? Math.max(a, 0.9) : a * 0.15;
+        if (focus) a = focus.has(i) ? Math.max(a, 0.5 + 0.4 * fade) : a * dim;
         if (a < 0.05) continue;
+        ctx.globalAlpha = a * 0.85;
+        ctx.strokeStyle = theme.bg;
+        ctx.strokeText(m.nodes[i].name, sim.x[i], sim.y[i] + r + 3 / view.k);
         ctx.globalAlpha = a;
-        ctx.fillText(m.nodes[i].name, sim.x[i], sim.y[i] + r + 2 / view.k);
+        ctx.fillStyle = i === hover || i === L.active ? theme.text : theme.muted;
+        ctx.fillText(m.nodes[i].name, sim.x[i], sim.y[i] + r + 3 / view.k);
       }
       ctx.globalAlpha = 1;
     }
@@ -239,7 +301,7 @@ export function GraphCanvas({ model, activePath, colorMode, fitKey, positions, a
         const dx = sim.x[i] - w.x;
         const dy = sim.y[i] - w.y;
         const d = dx * dx + dy * dy;
-        const r = nodeRadius(L.model.nodes[i].degree) + 3 / L.view.k;
+        const r = nodeRadius(L.model.nodes[i].degree) * L.style.nodeSize + 3 / L.view.k;
         if (d <= r * r && d < bestD) (best = i, (bestD = d));
       }
       return best;
@@ -371,6 +433,7 @@ export function GraphCanvas({ model, activePath, colorMode, fitKey, positions, a
     L.model = model;
     L.hover = -1;
     L.sim = new ForceSimulation(initialPositions(model, positions.current), model.edges);
+    L.sim.opts = simOpts(L.sim, L.style);
     // A graph that only changed slightly (a note was edited) settles gently instead of exploding.
     const reused = model.nodes.filter((n) => positions.current.has(n.path)).length;
     L.sim.alpha = reused > model.nodes.length * 0.8 ? 0.25 : 1;
@@ -396,6 +459,22 @@ export function GraphCanvas({ model, activePath, colorMode, fitKey, positions, a
   useEffect(() => {
     live.current.schedule();
   }, [colorMode, alwaysLabels]);
+
+  // Physics knobs: apply to the running layout and let it ease into the new shape.
+  const { linkDistance, repel, center } = style;
+  useEffect(() => {
+    const L = live.current;
+    if (!L.sim) return;
+    const next = simOpts(L.sim, L.style);
+    const changed = next.linkDistance !== L.sim.opts.linkDistance || next.charge !== L.sim.opts.charge || next.gravity !== L.sim.opts.gravity;
+    L.sim.opts = next;
+    if (changed) L.sim.reheat(0.4);
+    L.schedule();
+  }, [linkDistance, repel, center]);
+
+  useEffect(() => {
+    live.current.schedule();
+  }, [style]);
 
   return (
     <div ref={wrap} className="graph-canvas-wrap">
@@ -424,4 +503,8 @@ function initialPositions(model: GraphModel, saved: Map<string, { x: number; y: 
     const r = 12 * Math.sqrt(spiral);
     return { x: Math.cos(spiral * golden) * r, y: Math.sin(spiral * golden) * r };
   });
+}
+
+function simOpts(sim: ForceSimulation, style: GraphStyle) {
+  return { ...sim.opts, linkDistance: style.linkDistance, charge: style.repel, gravity: style.center };
 }
