@@ -48,7 +48,9 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-태그와 `tauri.conf.json`의 버전이 다르면 빌드를 멈춰요. 끝나면 저장소의 **Releases**에 아래 파일이 생겨요. 비공개 저장소라서 내 GitHub 계정으로 로그인해야 받을 수 있어요.
+데스크톱 구글 로그인에는 클라이언트 보안 비밀이 필요해요. 공개 저장소에 값을 올릴 수 없어서, 첫 릴리스 전에 저장소 **Settings → Secrets and variables → Actions → Secrets**에 `VITE_GOOGLE_CLIENT_SECRET`을 등록해 두세요(값은 구글 콘솔의 데스크톱 클라이언트에서 복사). 릴리스 워크플로가 빌드할 때 이 값을 넘겨요. 없으면 빌드는 되지만 설치 파일에서 로그인할 때 안내 오류가 떠요. 자세한 내용은 [구글 설정 가이드](GOOGLE_SETUP.md)를 보세요.
+
+태그와 `tauri.conf.json`의 버전이 다르면 빌드를 멈춰요. 끝나면 저장소의 **Releases**에 아래 파일이 생겨요. 저장소가 공개면 누구나 받을 수 있고, 비공개면 내 GitHub 계정으로 로그인해야 받을 수 있어요.
 
 - 윈도우: `Yobsidian_<버전>_x64-setup.exe`(설치 프로그램), `.msi`
 - 맥: `Yobsidian_<버전>_universal.dmg` (애플 실리콘·인텔 모두)
@@ -76,4 +78,5 @@ git push origin v0.2.0
 - [ ] 웹 호스트 고르기 → 위 "GitHub Pages로" 또는 "Cloudflare Pages로" 단계 따라 하기 (변수 `DEPLOY_TARGET`이 없으면 배포는 건너뛰어요)
 - [ ] 배포된 주소의 origin을 구글 클라이언트의 **승인된 JavaScript 원본**에 추가
 - [ ] (선택) 변수 `VITE_GOOGLE_CLIENT_ID` 추가 (다른 클라이언트를 쓸 때만)
+- [ ] 저장소 Actions **Secret** `VITE_GOOGLE_CLIENT_SECRET` 등록 (데스크톱 클라이언트의 보안 비밀. 구글 콘솔 → 클라이언트에서 확인)
 - [ ] 첫 릴리스: 태그 `v0.1.0` 푸시 (`git tag v0.1.0 && git push origin v0.1.0`)
