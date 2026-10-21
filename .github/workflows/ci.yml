@@ -31,6 +31,8 @@ jobs:
 
   desktop:
     name: Desktop (${{ matrix.name }})
+    # PR에서는 web만 검증한다. 데스크톱 전체 빌드는 main 푸시·수동 실행에서만 (macOS 분량 10배)
+    if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:
