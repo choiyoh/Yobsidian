@@ -119,3 +119,19 @@ describe("ForceSimulation", () => {
     console.log(`4000 nodes, ${links.length} links: ${perTick.toFixed(1)} ms per tick`);
   });
 });
+
+describe("ForceSimulation stability", () => {
+  it("never moves a node further than maxStep per tick, even from a crowded start", () => {
+    const n = 200;
+    const pos = Array.from({ length: n }, (_, i) => ({ x: (i % 5) * 0.1, y: Math.floor(i / 5) * 0.1 }));
+    const links: [number, number][] = Array.from({ length: n - 1 }, (_, i) => [i, i + 1]);
+    const sim = new ForceSimulation(pos, links);
+    for (let t = 0; t < 300 && !sim.settled; t++) {
+      const px = Float64Array.from(sim.x);
+      const py = Float64Array.from(sim.y);
+      sim.tick();
+      for (let i = 0; i < n; i++) expect(Math.hypot(sim.x[i] - px[i], sim.y[i] - py[i])).toBeLessThanOrEqual(sim.opts.maxStep + 1e-9);
+    }
+    expect(sim.settled).toBe(true);
+  });
+});
