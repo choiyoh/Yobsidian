@@ -12,9 +12,11 @@ export interface SimOptions {
   alphaMin: number;
   /** Barnes-Hut accuracy: bigger is faster and rougher. */
   theta: number;
+  /** Longest distance a node may travel in one tick; keeps a crowded start from flinging nodes across the canvas. */
+  maxStep: number;
 }
 
-export const DEFAULT_SIM: SimOptions = { charge: 90, linkDistance: 38, gravity: 0.035, friction: 0.42, alphaDecay: 0.0228, alphaMin: 0.002, theta: 0.9 };
+export const DEFAULT_SIM: SimOptions = { charge: 90, linkDistance: 38, gravity: 0.035, friction: 0.42, alphaDecay: 0.0228, alphaMin: 0.002, theta: 0.9, maxStep: 12 };
 
 export class ForceSimulation {
   readonly n: number;
@@ -108,6 +110,11 @@ export class ForceSimulation {
       } else {
         vx[i] *= keep;
         vy[i] *= keep;
+        const sp = Math.hypot(vx[i], vy[i]);
+        if (sp > opts.maxStep) {
+          vx[i] *= opts.maxStep / sp;
+          vy[i] *= opts.maxStep / sp;
+        }
         x[i] += vx[i];
         y[i] += vy[i];
       }

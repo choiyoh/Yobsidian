@@ -32,7 +32,13 @@ interface View {
   y: number;
 }
 
-const FIT_TICKS = 90;
+/** Bounds of the layout for fitting the view, ignoring a few stragglers so one far-off island does not shrink everything to a dot. */
+function fitBounds(sim: ForceSimulation) {
+  const xs = Array.from(sim.x.subarray(0, sim.n)).sort((a, b) => a - b);
+  const ys = Array.from(sim.y.subarray(0, sim.n)).sort((a, b) => a - b);
+  const cut = sim.n > 20 ? Math.floor(sim.n * 0.03) : 0;
+  return { x0: xs[cut], x1: xs[sim.n - 1 - cut], y0: ys[cut], y1: ys[sim.n - 1 - cut] };
+}
 
 function readTheme(el: HTMLElement): Theme {
   const css = getComputedStyle(el);
@@ -69,9 +75,10 @@ export function GraphCanvas({ model, activePath, colorMode, fitKey, positions, a
     raf: 0,
     ticks: 0,
     autoFit: true,
+    fitting: false,
     onOpen,
     schedule: () => {},
-    fit: () => {},
+    fit: (_snap?: boolean) => {},
   });
   live.current.onOpen = onOpen;
   live.current.colorMode = colorMode;
@@ -98,26 +105,28 @@ live.current.style = style;
       L.dpr = window.devicePixelRatio || 1;
       cv.width = Math.round(L.width * L.dpr);
       cv.height = Math.round(L.height * L.dpr);
-      if (L.autoFit) fit();
+      if (L.autoFit) fit(true);
       schedule();
     };
 
-    const fit = () => {
+    /** Aims the view at the whole layout. `snap` jumps there; otherwise the view eases over, so a moving layout does not make the camera twitch. */
+    const fit = (snap = false) => {
       const sim = L.sim;
       if (!sim || !sim.n) return;
-      let x0 = Infinity,
-        y0 = Infinity,
-        x1 = -Infinity,
-        y1 = -Infinity;
-      for (let i = 0; i < sim.n; i++) {
-        x0 = Math.min(x0, sim.x[i]);
-        x1 = Math.max(x1, sim.x[i]);
-        y0 = Math.min(y0, sim.y[i]);
-        y1 = Math.max(y1, sim.y[i]);
-      }
+      const { x0, x1, y0, y1 } = fitBounds(sim);
       const pad = 40;
       const k = Math.min(2, Math.max(0.05, Math.min((L.width - pad * 2) / Math.max(x1 - x0, 1), (L.height - pad * 2) / Math.max(y1 - y0, 1))));
-      L.view = { k, x: L.width / 2 - ((x0 + x1) / 2) * k, y: L.height / 2 - ((y0 + y1) / 2) * k };
+      const goal = { k, x: L.width / 2 - ((x0 + x1) / 2) * k, y: L.height / 2 - ((y0 + y1) / 2) * k };
+      if (snap) {
+        L.view = goal;
+        return;
+      }
+      const v = L.view;
+      const e = 0.18;
+      // Zoom in log space so it feels even in both directions.
+      const nk = v.k * Math.pow(goal.k / v.k, e);
+      L.view = Math.abs(goal.k / v.k - 1) < 0.002 && Math.abs(goal.x - v.x) < 0.5 && Math.abs(goal.y - v.y) < 0.5 ? goal : { k: nk, x: v.x + (goal.x - v.x) * e, y: v.y + (goal.y - v.y) * e };
+      if (L.view !== goal) L.fitting = true;
     };
     L.fit = fit;
 
@@ -140,8 +149,9 @@ live.current.style = style;
           L.ticks++;
           n++;
         } while (n < 4 && performance.now() - t0 < 5 && !sim.settled);
-        if (L.autoFit && L.ticks <= FIT_TICKS) fit();
       }
+      L.fitting = false;
+      if (L.autoFit) fit();
       const target = L.hover >= 0 ? 1 : 0;
       if (L.hover >= 0) L.focus = L.hover;
       if (L.fade !== target) {
@@ -150,7 +160,7 @@ live.current.style = style;
         if (L.fade === 0) L.focus = -1;
       }
       draw();
-      if ((sim && !sim.settled) || L.fade !== target) schedule();
+      if ((sim && !sim.settled) || L.fade !== target || L.fitting) schedule();
     }
 
     function draw() {
@@ -446,7 +456,7 @@ live.current.style = style;
     L.autoFit = true;
     L.ticks = 0;
     L.sim?.reheat(0.6);
-    L.fit();
+    L.fit(true);
     L.schedule();
   }, [fitKey]);
 
